@@ -1,0 +1,20 @@
+IdMeasurement,Type,Navn,Unit,UnitAlias,obvious_min,obvious_max,StartTime,EndTime
+G71F04R_Level1,Level,Niv. Indløb 1,m,Meter,0.001,1.5,2010-08-01,2021-08-19
+G71F04R_Level2,Level,Niv. Indløb 2,m,Meter,0.001,1.5,2010-08-01,2021-08-19
+G71F05R_LevelBasin,Level,Niv. Skyllevandsbeh.,m,Meter,0.0,5.0,2010-08-01,2021-08-19
+G71F05R_LevelInlet,Level,Niv. Indløb,m,Meter,0.001,1.5,2010-08-01,2021-08-19
+G71F05R_position,Position,Position throttle,m,Meter,0.0,3.0,2010-08-01,2021-08-19
+G71F06R_LevelInlet,Level,BV6 Niveaumåler indløb,m,Meter,0.002,3.0,2010-08-01,2021-08-19
+G71F68Y_LevelPS,Level,Niv. Pumpesump,m,Meter,0.001,5.5,2010-08-01,2021-08-19
+G71F68Yp1,Discharge,Flowmåler,m3/s,m3/s,-5.0,5.0,2010-08-01,2021-08-19
+G71F68Yp1_power,Power,Pumpe1,A,Ampere,0.0,50.0,2017-03-07,2021-08-19
+G71F68Yp2_power,Power,Pumpe2,A,Ampere,0.0,50.0,2017-03-07,2021-08-19
+G72F040,Level,Level,m,Meter,0.0,100.0,2020-01-08,2020-03-23
+G73F010,Level,Level,m,Meter,0.0,100.0,2019-06-27,2021-08-19
+G80F11B_Level1,Level,Niveaumåler 1 bassin,m,Meter,0.0,100.0,2019-10-23,2021-08-19
+G80F11B_Level2,Level,Niveaumåler 2 bassin,m,Meter,0.0,100.0,2019-10-23,2021-08-19
+G80F13P_LevelPS,Level,Niveau pumpesump,m,Meter,0.001,4.0,2010-01-01,2021-08-19
+G80F13Pp1_power,Power,Strømforbrug P1,A,Ampere,0.0,50.0,2010-01-01,2021-08-19
+G80F13Pp2_power,Power,Strømforbrug P2,A,Ampere,0.0,50.0,2010-01-01,2021-08-19
+G80F66Y_Level1,Level,Niveaumåler 1 indløb,m,Meter,0.001,100.0,2019-10-23,2021-08-19
+G80F66Y_Level2,Level,Niveaumåler 2 indløb,m,Meter,0.001,100.0,2019-10-23,2021-08-19

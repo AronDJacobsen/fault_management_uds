@@ -1,0 +1,89 @@
+
+
+# Anomaly Injection Types
+anomalies:
+
+  # -----------------
+  spike:
+    # Define severity based on; duration and magnitude
+    # Medium spike
+    medium:
+      # proportion of data to be injected with anomaly in percentage
+      proportion: 0.0001
+      # Duration is in minutes
+      duration:
+        # sample durations from a normal distribution
+        normal:
+          mean: 1
+          std: 1
+
+      # Magnitude in percentage of e.g. data range or standard deviation
+      magnitude:
+        sign: + # +, - or +-
+        range:
+          min: 0.01
+          max: 0.02
+
+  # -----------------
+  noise:
+    medium:
+      proportion: 0.002
+      duration:
+        normal:
+          mean: 60
+          std: 15 
+      # magnitude is the standard deviation of the noise
+      magnitude:
+        sign: +
+        range:
+          min: 0.005
+          max: 0.005
+
+  # -----------------
+  frozen:
+    medium:
+      proportion: 0.005
+      duration:
+        normal:
+          mean: 120
+          std: 30
+      # not required for frozen, set to null
+      magnitude:
+        sign: null
+        range:
+          min: null
+          max: null
+
+  # -----------------
+  offset:
+    medium:
+      proportion: 0.02
+      duration:
+        normal:
+          mean: 720 # 12 hours
+          std: 60 # 1 hour
+      # magnitude is the offset value, similar to spike
+      magnitude:
+        sign: +
+        range: 
+          min: 0.08
+          max: 0.10
+
+  # -----------------
+  drift:
+    medium:
+      proportion: 0.02
+      duration:
+        normal:
+          mean: 720 # 12 hours
+          std: 60 # 1 hour
+      # magnitude is the final value of the drift, similar to spike
+      magnitude:
+        sign: +
+        range:
+          min: 0.08
+          max: 0.10
+
+
+
+

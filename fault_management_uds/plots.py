@@ -57,7 +57,9 @@ def convert_to_matplotlib_dates(starts, ends, start):
     return starts_num, ends_num
 
 
-def visualize_error_timeline(ax, individual_indicators, start=None, end=None, adjust='half-point'):
+
+
+def visualize_indicator_dict(ax, individual_indicators, start=None, end=None, adjust='half-point', ylabel='Errors'):
     bar_width = 0.5
     for i, (indicator, indicator_meta) in enumerate(individual_indicators.items()):
         segment_starts, segment_ends, segment_color = get_segment_start_end_color(
@@ -76,17 +78,17 @@ def visualize_error_timeline(ax, individual_indicators, start=None, end=None, ad
 
         ax.broken_barh(segments, (i - bar_width / 2, bar_width), facecolors=segment_color)
 
-    # # Set the x-limits if start and end are provided
-    # if start is not None and end is not None:
-    #     ax.set_xlim(mdates.date2num(start), mdates.date2num(end))
+    # if start and end are not none, set the x-axis limits and ticks
+    if start is not None and end is not None:
+        ax.set_xlim(start, end)
+        ax = set_meaningful_xticks(ax, start, end)
     
     ax.set_yticks(np.arange(len(individual_indicators)))
     ax.set_yticklabels(individual_indicators.keys())
     ax.invert_yaxis()
-    ax.set_title('Errors')
+    ax.set_title(ylabel)
 
     return ax
-
 
 
 
@@ -158,158 +160,5 @@ def set_meaningful_xticks(ax, start, end):
         ax.tick_params(axis='x', which='major', labelsize=10, rotation=0, pad=5.5)
     return ax
 
-def set_meaningful_xaxis_timestamps(ax, timestamps_df):
-
-    # x-axis
-    ax.set_xlim(0, len(timestamps_df))
-    # Get indices of rows where 'time' is on January 1st at 00:00:00
-    start_idx = timestamps_df[
-        (timestamps_df['time'].dt.month == 1) &
-        (timestamps_df['time'].dt.day == 1) &
-        (timestamps_df['time'].dt.hour == 0) &
-        (timestamps_df['time'].dt.minute == 0) &
-        (timestamps_df['time'].dt.second == 0)
-    ].index
-    start_vals = timestamps_df.loc[start_idx, 'time'].dt.year.values
-    # check if xticks will only be one year
-    if len(start_idx) < 2:
-        # plot on a monthly basis
-        start_idx = timestamps_df[
-            (timestamps_df['time'].dt.day == 1) &
-            (timestamps_df['time'].dt.hour == 0) &
-            (timestamps_df['time'].dt.minute == 0) &
-            (timestamps_df['time'].dt.second == 0)
-        ].index
-        start_vals = timestamps_df.loc[start_idx, 'time'].dt.strftime('%m-%Y').values
-        # check if xticks will only be one month
-        if len(start_idx) < 2:
-            # plot on a daily basis
-            start_idx = timestamps_df[
-                (timestamps_df['time'].dt.hour == 0) &
-                (timestamps_df['time'].dt.minute == 0) &
-                (timestamps_df['time'].dt.second == 0)
-            ].index
-            start_vals = timestamps_df.loc[start_idx, 'time'].dt.strftime('%d-%m-%Y').values
-            # check if daily xticks will be less than 3 days
-            if len(start_idx) < 3:
-                # plot on every 12 hours
-                start_idx = timestamps_df[
-                    (timestamps_df['time'].dt.hour % 12 == 0) &
-                    (timestamps_df['time'].dt.minute == 0) &
-                    (timestamps_df['time'].dt.second == 0)
-                ].index
-                start_vals = timestamps_df.loc[start_idx, 'time'].dt.strftime('%d-%m-%Y %H:%M').values
-
-                # check if every 12 hours xticks will be less than 2
-                if len(start_idx) < 2:
-                    # plot on every 6 hours
-                    start_idx = timestamps_df[
-                        (timestamps_df['time'].dt.hour % 6 == 0) &
-                        (timestamps_df['time'].dt.minute == 0) &
-                        (timestamps_df['time'].dt.second == 0)
-                    ].index
-                    start_vals = timestamps_df.loc[start_idx, 'time'].dt.strftime('%d-%m-%Y %H:%M').values
-                    # check if every 6 hours xticks will be less than 2
-                    if len(start_idx) < 2:
-                        # plot on every 1 hour
-                        start_idx = timestamps_df[
-                            (timestamps_df['time'].dt.minute == 0) &
-                            (timestamps_df['time'].dt.second == 0)
-                        ].index
-                        start_vals = timestamps_df.loc[start_idx, 'time'].dt.strftime('%d-%m-%Y %H:%M').values
-                        # check if every 1 hour xticks will be less than 2
-                        if len(start_idx) < 3:
-                            # plot on every 30 minutes
-                            start_idx = timestamps_df[
-                                (timestamps_df['time'].dt.minute % 30 == 0) &
-                                (timestamps_df['time'].dt.second == 0)
-                            ].index
-                            start_vals = timestamps_df.loc[start_idx, 'time'].dt.strftime('%d-%m-%Y %H:%M').values
-                            # check if every 30 minutes xticks will be less than 2
-                            if len(start_idx) < 2:
-                                # plot on every 15 minutes
-                                start_idx = timestamps_df[
-                                    (timestamps_df['time'].dt.minute % 15 == 0) &
-                                    (timestamps_df['time'].dt.second == 0)
-                                ].index
-                                start_vals = timestamps_df.loc[start_idx, 'time'].dt.strftime('%d-%m-%Y %H:%M').values
 
 
-    # Set the x-ticks and labels
-    ax.set_xticks(start_idx)
-    ax.set_xticklabels(start_vals)
-    return ax
-    
-
-def visualize_single_timeline(I, timestamps_df, variable, indicator_2_color, name_2_color, figsize=(16, 4)):
-    """
-    Visualize the timeline of the data with different indicators
-    """
-
-    # if I is 1D, convert it to 2D
-    if len(I.shape) == 1:
-        I = I.reshape(1, -1)
-
-    # Transpose the 2D array I to have the variables as rows
-    #I = I.copy().T
-
-    # Set up the figure and axes
-    fig, ax = plt.subplots(figsize=figsize, dpi=400)
-
-    bar_width = 0.4
-
-
-    # Iterate over each row in the 2D array I to plot segments
-    for i, row in enumerate(I):
-        segment_starts, segment_ends, segment_color = get_segment_start_end_color(row, indicator_2_color)
-        segments = np.column_stack((segment_starts, segment_ends - segment_starts))
-        # plot the segments
-        ax.broken_barh(segments, (i - bar_width/2, bar_width), facecolors=segment_color)
-
-
-    # Set the legend
-    legend_elements = [Patch(facecolor=color, label=name) for name, color in name_2_color.items()]
-    ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.15, 1))
-
-    # expand the y-axis to make the plot look better
-    ax.set_ylabel(variable, rotation=90, ha="center")
-    ax.set_yticks([])  # Remove y-axis ticks and labels
-    ax.set_ylim(-bar_width/2, bar_width/2)
-    ax.invert_yaxis()
-
-
-    # Set the x-axis
-    ax = set_meaningful_xaxis_timestamps(ax, timestamps_df)
-
-    # # add vertical lines for the years
-    # for year in year_start_idx:
-    #     ax.axvline(x=year, color='lightgray', linestyle='--', linewidth=0.5)
-    # remove outer frame
-    ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False); ax.spines['left'].set_visible(False); ax.spines['bottom'].set_visible(False)
-    # Show the plot
-    plt.tight_layout()
-    plt.show()
-
-
-
-# app = typer.Typer()
-
-
-# @app.command()
-# def main(
-#     # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
-#     input_path: Path = PROCESSED_DATA_DIR / "dataset.csv",
-#     output_path: Path = FIGURES_DIR / "plot.png",
-#     # -----------------------------------------
-# ):
-#     # ---- REPLACE THIS WITH YOUR OWN CODE ----
-#     logger.info("Generating plot from data...")
-#     for i in tqdm(range(10), total=10):
-#         if i == 5:
-#             logger.info("Something happened for iteration 5.")
-#     logger.success("Plot generation complete.")
-#     # -----------------------------------------
-
-
-# if __name__ == "__main__":
-#     app()

@@ -46,7 +46,7 @@ def consecutive_nans_until_not(lst, consecutive_count=5):
 
 
 
-def remove_nans_from_start_end(df, column_name):
+def remove_nans_from_start_end(df, column_name='value'):
     df = df.copy()
     # check if time is in the index and set it as a column instead
     time_is_index = False
@@ -71,6 +71,8 @@ def remove_nans_from_start_end(df, column_name):
         sliced_df.set_index('time', inplace=True)
 
     return sliced_df
+
+
 
 
 def ensure_data_is_from_start_to_end(data, start, end):

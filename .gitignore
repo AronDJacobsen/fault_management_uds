@@ -1,10 +1,7 @@
-# Data
-/data/*
-
-/models/*
-
-/reports/figures/*
-
+# Don't include
+data/*
+models/*
+reports/figures/*
 
 
 # Mac OS-specific storage files

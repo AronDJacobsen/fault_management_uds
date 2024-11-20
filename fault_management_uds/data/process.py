@@ -46,27 +46,71 @@ def consecutive_nans_until_not(lst, consecutive_count=5):
 
 
 
-def remove_nans_from_start_end(df, column_name='value'):
+# def remove_nans_from_start_end(df, columns=['value']):
+#     df = df.copy()
+#     # check if time is in the index and set it as a column instead
+#     time_is_index = False
+#     if isinstance(df.index, pd.DatetimeIndex):
+#         time_is_index = True
+#         df.reset_index(inplace=True, drop=False, names='time')
+
+#     if isinstance(columns, str):
+#         columns = [columns]
+
+#     df.sort_values(by='time', inplace=True)
+#     df.reset_index(drop=True, inplace=True)
+#     # Find the first non-NaN index for 'raw_value'
+#     first_non_nan_index = df[columns].notna().idxmax()
+    
+#     # Find the last non-NaN index for 'raw_value' by reversing the series
+#     last_non_nan_index = df[columns][::-1].notna().idxmax()
+
+#     # Slice the DataFrame to remove NaNs from the start and end
+#     sliced_df = df.iloc[first_non_nan_index:last_non_nan_index + 1]
+#     sliced_df.reset_index(drop=True, inplace=True)
+
+#     # check if time was in the index and set it back as the index
+#     if time_is_index:
+#         sliced_df.set_index('time', inplace=True)
+
+#     return sliced_df
+
+
+
+def remove_nans_from_start_end(df, columns=['value']):
     df = df.copy()
-    # check if time is in the index and set it as a column instead
+
+    # Check if time is in the index and set it as a column instead
     time_is_index = False
     if isinstance(df.index, pd.DatetimeIndex):
         time_is_index = True
         df.reset_index(inplace=True, drop=False, names='time')
 
+    if isinstance(columns, str):
+        columns = [columns]
+
     df.sort_values(by='time', inplace=True)
     df.reset_index(drop=True, inplace=True)
-    # Find the first non-NaN index for 'raw_value'
-    first_non_nan_index = df[column_name].notna().idxmax()
-    
-    # Find the last non-NaN index for 'raw_value' by reversing the series
-    last_non_nan_index = df[column_name][::-1].notna().idxmax()
+
+    # Initialize indices
+    first_non_nan_index = 0
+    last_non_nan_index = len(df)
+
+    # Find the first and last non-NaN indices across all specified columns
+    for column in columns:
+        first_non_nan = df[column].first_valid_index()
+        last_non_nan = df[column].last_valid_index()
+
+        if first_non_nan is not None:
+            first_non_nan_index = max(first_non_nan_index, first_non_nan)
+        if last_non_nan is not None:
+            last_non_nan_index = min(last_non_nan_index, last_non_nan)
 
     # Slice the DataFrame to remove NaNs from the start and end
     sliced_df = df.iloc[first_non_nan_index:last_non_nan_index + 1]
     sliced_df.reset_index(drop=True, inplace=True)
 
-    # check if time was in the index and set it back as the index
+    # Check if time was in the index and set it back as the index
     if time_is_index:
         sliced_df.set_index('time', inplace=True)
 

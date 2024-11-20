@@ -1,5 +1,11 @@
 # Data
-/data/
+/data/*
+
+/models/*
+
+/reports/figures/*
+
+
 
 # Mac OS-specific storage files
 .DS_Store

@@ -183,7 +183,10 @@ def load_dataframe_from_HDF5(data_file_path, group_path, starttime=None, endtime
                 df = df.reindex(full_time_range, fill_value=fillna_with)
                 #print(f"Reindexed the DataFrame to the full time range from {starttime} to {endtime}")
                 start_idx, end_idx, column_indices = None, None, None
-                
+            
+            # order by specified columns
+            if columns is not None:
+                df = df[columns]
 
             return df, start_idx, end_idx, column_indices
 

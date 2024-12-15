@@ -133,7 +133,9 @@ def load_dataframe_from_HDF5(data_file_path, group_path, starttime=None, endtime
             
             # Handle starttime and endtime filtering
             if starttime is not None:
+                starttime = pd.to_datetime(starttime)
                 start_idx = np.searchsorted(all_timestamps, starttime, side='left')
+
                 if start_idx >= len(all_timestamps) or all_timestamps[start_idx] != starttime:
                     print(f"    Warning: The start time {starttime} is not in the data. The closest timestamp is {all_timestamps[start_idx]}") if verbose else None
             else:
@@ -141,16 +143,12 @@ def load_dataframe_from_HDF5(data_file_path, group_path, starttime=None, endtime
                 #starttime = all_timestamps[start_idx]
 
             if endtime is not None:
-                # # check if endtime has hours specified
-                # if endtime.hour == 0 and endtime.minute == 0 and endtime.second == 0:
-                #     # endtime is the start of the day, add a day to include the endtime
-                #     endtime = endtime + timedelta(days=1)
+                endtime = pd.to_datetime(endtime)
                 end_idx = np.searchsorted(all_timestamps, endtime, side='right')
                 if end_idx == 0 or all_timestamps[end_idx - 1] != endtime:
                     print(f"    Warning: The end time {endtime} is not in the data. The closest timestamp is {all_timestamps[end_idx - 1]}") if verbose else None
             else:
                 end_idx = len(all_timestamps)  # Go until the end
-                #endtime = all_timestamps[end_idx - 1]
 
             # Sanity check: Ensure valid time range
             if start_idx > end_idx:

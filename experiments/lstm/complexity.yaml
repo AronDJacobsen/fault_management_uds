@@ -1,0 +1,22 @@
+
+
+
+# python fault_management_uds/main.py --config "lstm/complexity.yaml"
+
+
+
+hparam_key_paths:
+  - training_args/lr
+  - model_args/hidden_size
+  - model_args/num_layers
+
+training_args:
+  lr: [0.001, 0.0005, 0.0001]
+
+model_args:
+  model_name: 'LSTM'
+  hidden_size: [64, 128, 256]
+  num_layers: [1, 2, 3]
+
+
+

@@ -8,7 +8,7 @@ For **unsupervised early detection of long-term errors** using a **GNN**, follow
 ### 2. **Model Architecture**
    - Use a **Spatio-Temporal Graph Neural Network (ST-GNN)**:
      - **Graph Convolutional Network (GCN)** to capture spatial dependencies.
-     - **Temporal layers** (LSTM, GRU, or Transformer) for modeling time evolution.
+     - **Temporal layers** (LSTM, GRU, or Transformer) for modelling time evolution.
      - **Attention mechanism** to focus on recent data for early detection of gradual changes.
 
 ### 3. **Anomaly Detection**

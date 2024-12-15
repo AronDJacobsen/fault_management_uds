@@ -77,3 +77,99 @@ def create_indicator(sensor_data, value_col, error_data, error_indicators, start
 
     return indicator
 
+
+# Function to merge overlapping intervals
+def merge_intervals(df):
+
+    # Sort the DataFrame by start time
+    df = df.sort_values(by='start').reset_index(drop=True)
+
+    if df.empty:
+        return df
+
+    merged_intervals = []
+    current_start = df.loc[0, 'start']
+    current_end = df.loc[0, 'end']
+    current_rainfall = df.loc[0, 'rainfall']
+
+    for i in range(1, len(df)):
+        row_start = df.loc[i, 'start']
+        row_end = df.loc[i, 'end']
+        row_rainfall = df.loc[i, 'rainfall']
+
+        if row_start <= current_end:  # Overlapping intervals
+            current_end = max(current_end, row_end)
+            # add the rainfall
+            current_rainfall += row_rainfall
+        else:
+            # No overlap, add the current interval to the list
+            merged_intervals.append({'start': current_start, 'end': current_end, 'rainfall': current_rainfall})
+            # Start a new interval
+            current_start = row_start
+            current_end = row_end
+            current_rainfall = row_rainfall
+
+    # Append the last interval
+    merged_intervals.append({'start': current_start, 'end': current_end, 'rainfall': current_rainfall})
+
+    return pd.DataFrame(merged_intervals)
+
+
+
+# # Function to merge overlapping intervals
+# def merge_intervals(df, start_col='start', end_col='end', agg_columns=None):
+#     """
+#     Merge overlapping intervals in a DataFrame.
+
+#     Parameters:
+#     df (pd.DataFrame): Input DataFrame with interval data.
+#     start_col (str): Name of the column representing the start of the interval.
+#     end_col (str): Name of the column representing the end of the interval.
+#     agg_columns (dict): Dictionary specifying aggregation functions for other columns. 
+#                         Example: {'rainfall': 'sum', 'temperature': 'mean'}
+
+#     Returns:
+#     pd.DataFrame: DataFrame with merged intervals.
+#     """
+#     if agg_columns is None:
+#         agg_columns = {}
+
+#     # Sort the DataFrame by the start column
+#     df = df.sort_values(by=start_col).reset_index(drop=True)
+
+#     merged_intervals = []
+#     current_interval = df.iloc[0].to_dict()
+
+#     for i in range(1, len(df)):
+#         row = df.iloc[i]
+
+#         if row[start_col] <= current_interval[end_col]:  # Overlapping intervals
+#             # Extend the current interval's end time
+#             current_interval[end_col] = max(current_interval[end_col], row[end_col])
+            
+#             # Aggregate additional columns
+#             for col, func in agg_columns.items():
+#                 if func == 'sum':
+#                     current_interval[col] += row[col]
+#                 elif func == 'mean':  # Weighted mean for simplicity
+#                     if 'count' not in current_interval:
+#                         current_interval['count'] = 1  # Initialize count
+#                     current_interval[col] = (current_interval[col] * current_interval['count'] + row[col]) / (current_interval['count'] + 1)
+#                     current_interval['count'] += 1
+#                 # Add more aggregation methods as needed
+#         else:
+#             # No overlap, add the current interval to the list
+#             merged_intervals.append(current_interval)
+#             current_interval = row.to_dict()
+
+#     # Append the last interval
+#     merged_intervals.append(current_interval)
+
+#     # Drop helper columns if added (like 'count')
+#     result_df = pd.DataFrame(merged_intervals)
+#     if 'count' in result_df:
+#         result_df.drop(columns=['count'], inplace=True)
+
+#     return result_df
+
+

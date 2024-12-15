@@ -1,0 +1,18 @@
+
+
+# python fault_management_uds/main.py --config "benchmark/1_mean_predictor.yaml"
+
+
+hparam_key_paths:
+  - model_args/model_name
+
+
+training_args:
+  # avoid training
+  skip_optimizer: true
+
+model_args:
+  model_name: 'MeanPredictor'
+  sequence_length: 1
+
+

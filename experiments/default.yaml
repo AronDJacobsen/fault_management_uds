@@ -1,0 +1,58 @@
+experiment_name: 'overwrite'
+
+# for evaluation
+predict_steps_ahead: 10
+
+hparam_key_paths:
+  # e.g. model_args.model_name
+
+dataset_args:
+  # Variables
+  engineered_vars: []
+  exogenous_vars: ['5425']
+  endogenous_vars: ['G71F05R_LevelInlet']
+
+  precision: 3
+  obvious_min: 0.001
+
+  # Prioritization
+  rain_event_priority: 1
+  # Data transformation
+  function_transform_type: 'none'
+  # Normalization
+  scaler_type: 'min-max'
+  feature_range: [0, 1]
+  nan_value: 0
+  # Data Augmentation
+  noise_injection: false
+
+  # Splitting
+  n_splits: 1
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  steps_ahead: 1
+
+training_args:
+  lr: 0.001
+  max_epochs: 50
+  max_steps: -1
+  batch_size: 64  
+  #num_workers: 0
+  skip_optimizer: false
+
+  # often fixed:
+  loss_function: 'MSELoss'
+  log_every_n_steps: 1
+  val_check_interval: 1.0
+  early_stopping_patience: 5
+  seed: 42
+
+model_args:
+  model_name: 'overwrite'
+  sequence_length: 120
+
+  # define model design
+  hidden_size: 64
+  num_layers: 1
+  dropout: 0.0

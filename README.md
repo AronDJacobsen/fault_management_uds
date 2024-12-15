@@ -24,7 +24,7 @@ conda env create -f environment.yml
 ├── data
 │   ├── external       <- Data from third party sources.
 │   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
+│   ├── processed      <- The final, canonical data sets for modelling.
 │   └── raw            <- The original, immutable data dump.
 │
 ├── docs               <- A default mkdocs project; see www.mkdocs.org for details
@@ -56,9 +56,9 @@ conda env create -f environment.yml
     │
     ├── dataset.py              <- Scripts to download or generate data
     │
-    ├── features.py             <- Code to create features for modeling
+    ├── features.py             <- Code to create features for modelling
     │
-    ├── modeling                
+    ├── modelling                
     │   ├── __init__.py 
     │   ├── predict.py          <- Code to run model inference with trained models          
     │   └── train.py            <- Code to train models
@@ -67,4 +67,27 @@ conda env create -f environment.yml
 ```
 
 --------
+
+
+Freeze the environment to a file:
+
+```bash
+conda env export > environment.yml
+```
+
+Create the environment from the file:
+
+```bash
+conda env create -f environment.yml
+```
+
+Similar for pip:
+
+```bash
+pip freeze > requirements.txt
+```
+
+```bash
+pip install -r requirements.txt
+```
 

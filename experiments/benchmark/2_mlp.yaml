@@ -1,0 +1,22 @@
+
+
+# python fault_management_uds/main.py --config "benchmark/2_mlp.yaml"
+
+
+
+hparam_key_paths:
+  - model_args/model_name
+
+training_args:
+  lr: 0.001
+
+model_args:
+  model_name: 'MLP'
+  hidden_size: 128
+  num_layers: 2
+
+
+
+
+
+

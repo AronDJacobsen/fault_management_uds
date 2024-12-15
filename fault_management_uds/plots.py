@@ -10,6 +10,9 @@ from matplotlib.patches import Patch
 import matplotlib.dates as mdates
 from datetime import timedelta
 
+import os
+import tensorflow as tf
+
 
 from fault_management_uds.config import FIGURES_DIR, PROCESSED_DATA_DIR
 
@@ -115,6 +118,46 @@ def visualize_error_span(ax, indicator, start, end, adjust='half-point', alpha=0
 
 
 
+
+def visualize_logs(logdir):
+    # first check if the logdir exists
+    if not logdir.exists():
+        print(f"Logdir {logdir} does not exist")
+        return
+    event_files = [f for f in os.listdir(logdir) if f.startswith("events.out.tfevents")]
+    assert len(event_files) == 1, "Multiple tensorboard files found"
+    event_file = event_files[0]
+    # Load the tensorboard logs
+    logs = {
+    }
+    for e in tf.compat.v1.train.summary_iterator(str(logdir / event_file)):
+        for v in e.summary.value:
+            if v.tag in logs:
+                logs[v.tag].append((e.step, v.simple_value))
+            else:
+                logs[v.tag] = [(e.step, v.simple_value)]
+    print(f"Loggers: {logs.keys()}")
+    tags = ['train_loss_step', 'train_loss_epoch', 'val_loss']
+
+    # Plot the logs
+    fig, ax = plt.subplots(figsize=(8, 4))
+    lowest_first_value = np.inf
+    min_step, max_step = np.inf, 0
+    for tag in tags:
+        values = logs[tag]
+        steps, values = zip(*values)
+        plt.plot(steps, values, label=tag, alpha=0.7, lw=1)
+        lowest_first_value = min(lowest_first_value, values[0])
+        min_step = min(min_step, steps[0])
+        max_step = max(max_step, steps[-1])
+    # update ylim
+    ax.set_ylim(0, lowest_first_value * 2)
+    ax.set_xlim(min_step, max_step)
+    plt.legend()
+    plt.tight_layout()
+    # save
+    plt.savefig(logdir / 'loss.png')
+    plt.close()
 
 def set_meaningful_xticks(ax, start, end):
 

@@ -1,0 +1,108 @@
+Wed Dec 18 18:00:55 2024       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 565.57.01              Driver Version: 565.57.01      CUDA Version: 12.7     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  Tesla V100-PCIE-32GB           On  |   00000000:D8:00.0 Off |                    0 |
+| N/A   30C    P0             26W /  250W |       1MiB /  32768MiB |      0%   E. Process |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+Warning: ['dataset_args', 'rain_event_priority'] is not a list; must be for hparam search
+
+##################################################
+EXPERIMENT 1/1
+Save folder: /work3/s194262/GitHub/fault_management_uds/models/lstm/rain_event_priority=100_241218_1801
+
+Hyperparameters: {'dataset_args/rain_event_priority': 100}
+##################################################
+
+Validity: 94418 minutes are invalid.
+Data validation passed.
+Model does not have additional configurations.
+Using CUDA
+Sanity Checking: |          | 0/? [00:00<?, ?it/s]Sanity Checking:   0%|          | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0:   0%|          | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0: 100%|██████████| 2/2 [00:00<00:00, 21.34it/s]                                                                           Training: |          | 0/? [00:00<?, ?it/s]Training:   0%|          | 0/62089 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/62089 [00:00<?, ?it/s] Epoch 0:   8%|▊         | 5000/62089 [01:35<18:11, 52.30it/s]Epoch 0:   8%|▊         | 5000/62089 [01:35<18:11, 52.30it/s, v_num=0, train_loss_step=6.54e-6]Epoch 0:   8%|▊         | 5000/62089 [02:56<33:37, 28.30it/s, v_num=0, train_loss_step=6.54e-6]
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@hpc.dtu.dk>
+Subject: Job 23475916: <_transf_test> in cluster <dcc> Exited
+
+Job <_transf_test> was submitted from host <hpclogin1> by user <s194262> in cluster <dcc> at Wed Dec 18 18:00:52 2024
+Job was executed on host(s) <4*n-62-11-13>, in queue <gpuv100>, as user <s194262> in cluster <dcc> at Wed Dec 18 18:00:53 2024
+</zhome/96/8/147177> was used as the home directory.
+</work3/s194262/GitHub/fault_management_uds> was used as the working directory.
+Started at Wed Dec 18 18:00:53 2024
+Terminated at Wed Dec 18 18:04:42 2024
+Results reported at Wed Dec 18 18:04:42 2024
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/sh 
+
+### -- set the job Name --
+#BSUB -J _transf_test
+### -- specify files --
+#BSUB -o /work3/s194262/GitHub/fault_management_uds/hpc_logs/%J-_transf_test.out
+#BSUB -e /work3/s194262/GitHub/fault_management_uds/hpc_logs/%J-_transf_test.err
+
+### General options
+### –- specify queue --
+#BSUB -q gpuv100
+### -- ask for number of cores (default: 1) --
+#BSUB -n 4
+### -- Select the resources: 1 gpu in exclusive process mode --
+#BSUB -gpu "num=1:mode=exclusive_process"
+### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
+#BSUB -W 24:00
+### -- request _ GB of system-memory --
+#BSUB -R "rusage[mem=4GB]"
+#BSUB -R "span[hosts=1]"
+
+
+nvidia-smi
+module load cuda/11.8
+
+source /work3/s194262/thesis/bin/activate
+
+cd /work3/s194262/GitHub/fault_management_uds
+
+python fault_management_uds/main.py --config "lstm/rain_event_priority.yaml" --num_workers 0
+
+
+
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   196.00 sec.
+    Max Memory :                                 2626 MB
+    Average Memory :                             2031.75 MB
+    Total Requested Memory :                     16384.00 MB
+    Delta Memory :                               13758.00 MB
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                12
+    Run time :                                   267 sec.
+    Turnaround time :                            230 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </work3/s194262/GitHub/fault_management_uds/hpc_logs/23475916-_transf_test.err> for stderr output of this job.
+

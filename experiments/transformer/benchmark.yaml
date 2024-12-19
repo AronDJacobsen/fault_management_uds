@@ -10,13 +10,13 @@ hparam_key_paths:
   - model_args/num_layers
 
 training_args:
-  lr: [0.001, 0.0005, 0.0001]
+  lr: [0.0005, 0.0001]
 
 model_args:
   model_name: 'Transformer'
-  hidden_size: [64, 128, 256]
-  num_heads: [4, 8]
-  num_layers: [2, 4, 6]
+  hidden_size: [32, 64, 128]
+  num_heads: [2, 4, 8]
+  num_layers: [1, 2]
 
 
 

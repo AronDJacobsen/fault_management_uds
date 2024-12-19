@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from fault_management_uds.data.hdf_functions import load_dataframe_from_HDF5
+from fault_management_uds.data.hdf_tools import load_dataframe_from_HDF5
 
 from fault_management_uds.config import error_indicators
 

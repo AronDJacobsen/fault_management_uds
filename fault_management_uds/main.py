@@ -8,27 +8,48 @@ import pickle
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+import torch
 
 
 from torch.utils.data import DataLoader
 from torch.utils.data import WeightedRandomSampler
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, TQDMProgressBar
 from pytorch_lightning.loggers import TensorBoardLogger
 
 
 from fault_management_uds.config import Config
 from fault_management_uds.utilities import folder_cleanup, seed_everything
 from fault_management_uds.data.dataset import load_data, get_datasets, handle_splits, identify_valid_indices
-from fault_management_uds.modelling.models import get_model
+from fault_management_uds.modelling.models import get_model, load_model_checkpoint
 from fault_management_uds.modelling.train import train_model
 from fault_management_uds.plots import visualize_logs
 from fault_management_uds.modelling.evaluate import evaluate_model_on_dataset
-from fault_management_uds.modelling.models import load_model_checkpoint
 
 
 from fault_management_uds.config import PROJ_ROOT
 from fault_management_uds.config import DATA_DIR, RAW_DATA_DIR, INTERIM_DATA_DIR, PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR
 from fault_management_uds.config import MODELS_DIR, REPORTS_DIR, FIGURES_DIR, REFERENCE_DIR
+
+
+# Set default global settings for tqdm
+tqdm_kwargs = {'mininterval': 60.0}  # Updates every _ seconds
+# Replace the tqdm function globally with pre-configured options
+import builtins
+builtins.tqdm = lambda *args, **kwargs: tqdm(*args, **{**tqdm_kwargs, **kwargs})
+
+
+# # Define a custom progress bar
+# class CustomProgressBar(TQDMProgressBar):
+#     def init_train_tqdm(self):
+#         bar = super().init_train_tqdm()
+#         bar.mininterval = 60.0  # Updates every 60 seconds
+#         return bar
+
+#     def init_validation_tqdm(self):
+#         bar = super().init_validation_tqdm()
+#         bar.mininterval = 60.0  # Updates every 60 seconds
+#         return bar
+    
 
 
 def get_additional_configurations(dataset):
@@ -89,8 +110,6 @@ def main():
         # Handle splits
         splits = handle_splits(n_obs, config.config['dataset_args'])
         config.config['split_folders'] = [config.config['save_folder'] / f"{i+1}_split" for i in range(config.config['dataset_args']['n_splits'])]
-        for folder in config.config['split_folders']:
-            os.makedirs(folder, exist_ok=True)
 
         # Save the configuration as yaml
         config.save_config(config.config['save_folder'])
@@ -103,6 +122,8 @@ def main():
             
             # Paths
             current_save_folder = config.config['split_folders'][i]
+            # create the folder
+            current_save_folder.mkdir(exist_ok=True)
             start_time = time.time()   
 
 
@@ -122,17 +143,18 @@ def main():
 
             # Define callbacks
             checkpoint_callback = ModelCheckpoint(
-                dirpath=current_save_folder, filename="{epoch:02d}-{val_loss:.6f}", save_last=True,
+                dirpath=current_save_folder, filename="{epoch:02d}-{val_loss:.7f}", save_last=True,
                 monitor="val_loss", save_top_k=1, mode="min",
             )
             early_stopping = EarlyStopping(monitor="val_loss", patience=config.config['training_args']['early_stopping_patience'], mode="min", verbose=False)
-            callbacks = [checkpoint_callback, early_stopping]
+            #custom_progress_bar = CustomProgressBar()
+            custom_progress_bar = TQDMProgressBar(refresh_rate=5000)
+            callbacks = [checkpoint_callback, early_stopping, custom_progress_bar]
             # logger
             logger = TensorBoardLogger(current_save_folder, sub_dir='', name='', version=0, default_hp_metric=False)
 
             # train model
             model, callbacks, logger = train_model(model, train_loader, val_loader, callbacks, logger, config.config['training_args'], current_save_folder)
-            training_time = (time.time() - start_time) / 60  # in minutes
             # save the run info
             run_info = {
                 'save_folder': str(current_save_folder),
@@ -156,7 +178,7 @@ def main():
             # evaluate the model
             eval_folder = current_save_folder / 'evaluation'
             eval_folder.mkdir(exist_ok=True)
-            # validation set
+            # validation set, update the valid indices and timestamps wrt forecast horizon
             val_dataset.valid_indices = identify_valid_indices(val_dataset.not_nan_mask, val_dataset.sequence_length, config.config['predict_steps_ahead'])
             val_dataset.valid_timestamps = pd.to_datetime(val_dataset.timestamps[val_dataset.valid_indices.cpu().numpy()])
             evaluate_model_on_dataset(eval_folder / 'val', model, val_dataset, dataset_config['scalers'], config, data_type='val')
@@ -167,13 +189,11 @@ def main():
 
             print('')
 
-        # save the split info
-        with open(config.config['save_folder'] / 'split_info.pkl', 'wb') as f:
-            pickle.dump(split_info, f)
+
+        # Save the split_info using torch.save (CPU-safe by default)
+        torch.save(split_info, config.config['save_folder'] / 'split_info.pkl')
 
         print(f"Run {config.config['experiment_name']} completed")
-
-        #raise ValueError("Stop here")
 
 
         print("\n")

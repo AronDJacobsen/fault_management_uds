@@ -4,6 +4,50 @@
 This document is a part of the *Anomaly management* project. It contains the considerations and difficulties that are encountered and addressed during the project.
 
 
+
+---
+# Dump
+
+#### Cleaning the whole dataset
+
+- train a AE on the whole dataset
+- apply KMeans to the latent space, elbow method to find the optimal number of clusters
+- assign each data point to a cluster
+- then split each cluster into train, val and test %
+  - but sorted by time
+  - this could ensure both learns and tests on all the data distribution
+
+
+####  Anomaly detection
+
+- Use Isolation Forest to detect anomalies
+- Build on data to create a vector; then test improvements
+  - first on prediction error
+    - then t-1 and t+1 errors also
+  - then with the target (t, but also t-1 and t+1)
+  - cosine similarity between
+    - attention weights at t and t+1
+    - hidden states at t and t+1
+  - pre-whitening of the data and residuals? or seasonal decomposition?
+    - maybe not needed with target is included
+  - hmm temporal also? the sin and cos?
+  
+
+#### Locally Integrated Gradients
+
+- After an outlier has been identified
+- Consider the time step where the outlier is the input values
+  - The baseline will be what the model predicted the outlier value to be
+  - Then, for e.g. each 10% intensity/interpolation, calculate the integrated gradients
+    - and store the value for the time step as a vector -> dim=10
+  - Then, can you use this for something?
+
+#### Other
+
+- is this close to the concept of kalman filtering?
+- flow: input data, attention, hidden state, output, target, error, input contribution
+
+
 ---
 
 # Considerations

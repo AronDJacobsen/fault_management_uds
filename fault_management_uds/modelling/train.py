@@ -33,6 +33,7 @@ def train_model(model, train_loader, val_loader, callbacks, logger, training_arg
         logger=logger,
         accelerator=accelerator,
         devices="auto",
+        #enable_progress_bar=False,
         )
     trainer.fit(model, train_loader, val_loader)
     return model, callbacks, logger 

@@ -12,7 +12,7 @@ from fault_management_uds.utilities import get_accelerator
 from fault_management_uds.data.transform import CustomScaler
 
 
-from fault_management_uds.data.hdf_functions import load_dataframe_from_HDF5
+from fault_management_uds.data.hdf_tools import load_dataframe_from_HDF5
 from fault_management_uds.data.process import remove_nans_from_start_end
 from fault_management_uds.data.features import add_rain_event_priority, add_feature_engineering
 from fault_management_uds.data.format import merge_intervals

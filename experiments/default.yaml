@@ -35,7 +35,7 @@ dataset_args:
 
 training_args:
   lr: 0.001
-  max_epochs: 50
+  max_epochs: 100
   max_steps: -1
   batch_size: 64  
   #num_workers: 0

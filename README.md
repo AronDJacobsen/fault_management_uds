@@ -68,26 +68,57 @@ conda env create -f environment.yml
 
 --------
 
+## Python Environment
+
 
 Freeze the environment to a file:
 
-```bash
-conda env export > environment.yml
-```
+    ```bash
+    pip freeze | grep -v "file://" > requirements.txt
+    ```
 
-Create the environment from the file:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-```bash
-conda env create -f environment.yml
-```
+And, install repo as editable:
 
-Similar for pip:
+    ```bash
+    pip install -e .
+    ```
 
-```bash
-pip freeze > requirements.txt
-```
+Activate:
 
-```bash
-pip install -r requirements.txt
-```
+    ```bash
+    source /work3/s194262/thesis/bin/activate
+    ```
+
+
+## HPC
+
+Submit job:
+
+    ```bash
+    bsub < submit.sh
+    ```
+
+Kill job:
+
+    ```bash
+    bkill -J <job_id>
+    ```
+
+Check job:
+
+    ```bash
+    bjobs
+    ```
+
+
+
+Links for HPC:
+1. [SSH and ThinLinc login using ssh-keys](https://www.hpc.dtu.dk/?page_id=4317)
+2. [Moving files to and from the cluster using ssh keys](https://www.hpc.dtu.dk/?page_id=4377#filezilla)
+- Proxy should be `None` in FileZilla
+
 

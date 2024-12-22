@@ -1,0 +1,21 @@
+
+
+# python fault_management_uds/main.py --config "testing.yaml" --fast_run True
+
+hparam_key_paths:
+  - model_args/model_name
+  - model_args/predict_difference
+
+
+
+
+model_args:
+  model_name: 'LSTM'
+  hidden_size: 16
+  num_layers: 1
+  predict_difference: true
+
+
+training_args:
+  max_epochs: 1
+  max_steps: -1

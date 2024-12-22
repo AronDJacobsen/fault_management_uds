@@ -2,6 +2,7 @@
 data/*
 models/*
 reports/figures/*
+hpc_logs/*
 
 # powerpoint files
 *.pptx

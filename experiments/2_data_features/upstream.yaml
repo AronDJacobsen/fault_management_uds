@@ -1,0 +1,14 @@
+
+
+
+
+
+hparam_key_paths:
+  - 'dataset_args/upstream'
+
+
+dataset_args:
+  upstream: 'G71F05R_LevelInlet'
+  exogenous_vars: ['5425', 'G71F05R_LevelInlet']
+
+

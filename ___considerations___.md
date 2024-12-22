@@ -8,6 +8,12 @@ This document is a part of the *Anomaly management* project. It contains the con
 ---
 # Dump
 
+#### TOOD:
+
+- more flexible handling of best model path -> make it relative path!
+
+
+
 #### Cleaning the whole dataset
 
 - train a AE on the whole dataset

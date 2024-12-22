@@ -1,14 +1,14 @@
 #!/bin/sh 
 
 ### -- set the job Name --
-#BSUB -J lstm
+#BSUB -J complexity
 ### -- specify files --
-#BSUB -o /work3/s194262/GitHub/fault_management_uds/hpc_logs/%J-lstm.out
-#BSUB -e /work3/s194262/GitHub/fault_management_uds/hpc_logs/%J-lstm.err
+#BSUB -o /work3/s194262/GitHub/fault_management_uds/hpc_logs/complexity-%J.out
+#BSUB -e /work3/s194262/GitHub/fault_management_uds/hpc_logs/complexity-%J.err
 
 ### General options
 ### –- specify queue --
-#BSUB -q gpuv100
+#BSUB -q gpua40
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 4
 ### -- Select the resources: 1 gpu in exclusive process mode --
@@ -27,6 +27,6 @@ source /work3/s194262/thesis/bin/activate
 
 cd /work3/s194262/GitHub/fault_management_uds
 
-python fault_management_uds/main.py --config "lstm/design_2.yaml" --num_workers 0
+python fault_management_uds/main.py --config "1_model_complexity/32_simple_v2.yaml" --num_workers 0
 
 

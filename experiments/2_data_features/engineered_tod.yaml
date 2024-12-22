@@ -1,0 +1,13 @@
+
+
+
+
+hparam_key_paths:
+  - 'dataset_args/engineered'
+
+
+dataset_args:
+  engineered: 'time_of_day'
+  engineered_vars: ['sin_tod', 'cos_tod']
+
+

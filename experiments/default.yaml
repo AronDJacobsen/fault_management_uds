@@ -4,13 +4,13 @@ experiment_name: 'overwrite'
 predict_steps_ahead: 10
 
 hparam_key_paths:
-  # e.g. model_args.model_name
+  - 'model_args/model_name'
 
 dataset_args:
   # Variables
   engineered_vars: []
   exogenous_vars: ['5425']
-  endogenous_vars: ['G71F05R_LevelInlet']
+  endogenous_vars: ['G71F04R_Level2']
 
   precision: 3
   obvious_min: 0.001
@@ -34,25 +34,36 @@ dataset_args:
   steps_ahead: 1
 
 training_args:
-  lr: 0.001
+  lr: 0.0005
   max_epochs: 100
   max_steps: -1
   batch_size: 64  
   #num_workers: 0
   skip_optimizer: false
+  scheduler: false
 
   # often fixed:
   loss_function: 'MSELoss'
   log_every_n_steps: 1
-  val_check_interval: 1.0
+  val_check_interval: 1.0 # 1.0 means once per epoch, 0.5 means twice per epoch
   early_stopping_patience: 5
   seed: 42
+  scheduler: false # [true, false]
+  dynamic_weighting: false # [true, false]
+  directional_errors: false # [true, false]
+
 
 model_args:
-  model_name: 'overwrite'
+  model_name: 'LSTM'
   sequence_length: 120
-
+  # Target
+  predict_difference: false
+  
   # define model design
   hidden_size: 64
   num_layers: 1
+  num_heads: 1
   dropout: 0.0
+
+  positional_encoding: false
+  aggregate_hidden: false

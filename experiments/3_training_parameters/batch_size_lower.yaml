@@ -1,0 +1,14 @@
+
+
+
+hparam_key_paths:
+  - 'training_args/batch_size'
+
+
+
+training_args:
+  batch_size: 32 # range
+
+
+
+

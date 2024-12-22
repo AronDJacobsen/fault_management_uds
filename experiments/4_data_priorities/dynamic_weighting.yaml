@@ -1,0 +1,12 @@
+
+
+
+
+
+hparam_key_paths:
+  - 'training_args/dynamic_weighting'
+
+
+training_args:
+  dynamic_weighting: true
+

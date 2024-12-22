@@ -1,0 +1,10 @@
+
+
+
+hparam_key_paths:
+  - 'dataset_args/rain_event_priority'
+
+
+
+dataset_args:
+  rain_event_priority: 4 # for 20% representation

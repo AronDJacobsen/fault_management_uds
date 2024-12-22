@@ -221,9 +221,9 @@ class Config:
     def __init__(self, config_path, fast_run=False, save_folder=None, num_workers=0):
         # Define experiment folder
         if save_folder is not None:
-            self.experiment_folder = save_folder / config_path.split('/')[0]
+            self.experiment_folder = save_folder / config_path.split('/')[0].split('.')[0]
         else:
-            self.experiment_folder = MODELS_DIR / config_path.split('/')[0]
+            self.experiment_folder = MODELS_DIR / config_path.split('/')[0].split('.')[0]
         os.makedirs(self.experiment_folder, exist_ok=True)
         self.num_workers = num_workers
         
@@ -242,7 +242,7 @@ class Config:
         if fast_run:
             # update parameters
             self.config['training_args']['max_epochs'] = -1
-            self.config['training_args']['max_steps'] = 10
+            self.config['training_args']['max_steps'] = 100
             self.config['training_args']['log_every_n_steps'] = 1
             self.config['training_args']['val_check_interval'] = 5
 
@@ -293,6 +293,8 @@ class Config:
     def get_hparam_grid(self):
         # If no hyperparameters are defined, return an empty list
         if self.config['hparam_key_paths'] is None:
+            # set the hparam to model name
+            #self.config['hparam_key_paths'] = [f"model_args/{self.config['model_args']['model_name']}"]
             raise ValueError("No hyperparameters defined; must define hparam_key_paths in the configuration")
         
         # Create a dictionary with the hyperparameters
@@ -339,6 +341,7 @@ class Config:
         os.makedirs(self.config['save_folder'], exist_ok=True)
 
     def get_dict_from_key_list_and_value(self, key_list, value):
+        # base case
         if len(key_list) == 1:
             return {key_list[0]: value}
         else:

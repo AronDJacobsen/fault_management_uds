@@ -1,0 +1,18 @@
+
+
+
+
+hparam_key_paths:
+  - 'model_args/dropout'
+
+
+
+
+
+model_args:
+  dropout: 0.1 # range
+
+
+
+
+

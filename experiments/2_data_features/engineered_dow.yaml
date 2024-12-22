@@ -1,0 +1,11 @@
+
+
+hparam_key_paths:
+  - 'dataset_args/engineered'
+
+
+dataset_args:
+  engineered: 'day_of_week'
+  engineered_vars: ['sin_dow', 'cos_dow']
+
+

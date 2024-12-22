@@ -58,6 +58,8 @@ def get_additional_configurations(dataset):
     additional_configurations['target_mean'] = dataset.data[dataset.valid_indices, dataset.endogenous_idx].mean()
     # endogenous_idx
     additional_configurations['endogenous_idx'] = dataset.endogenous_idx
+    # the number of data points
+    additional_configurations['n_obs'] = len(dataset)
     return additional_configurations
 
 
@@ -81,9 +83,9 @@ def main():
     config = Config(args.config, fast_run=args.fast_run, save_folder=args.save_folder, num_workers=args.num_workers)
     seed_everything(config.config['training_args']['seed'])
 
-    # Clean up folders
-    folder_cleanup(MODELS_DIR)
-    folder_cleanup(config.experiment_folder)
+    # # Clean up folders
+    # folder_cleanup(MODELS_DIR)
+    # folder_cleanup(config.experiment_folder)
     # Create experiment folder if it does not exist
     if not os.path.exists(config.experiment_folder):
         os.makedirs(config.experiment_folder)
@@ -104,7 +106,7 @@ def main():
 
         ### Load data
         data = load_data([None, None], config.config['dataset_args']['data_file_path'], config.config['dataset_args'], data_type='complete')
-        data = data if not args.fast_run else data.sample(3000)
+        data = data if not args.fast_run else data.iloc[:3000]
         n_obs = len(data)
 
         # Handle splits
@@ -139,28 +141,31 @@ def main():
             additional_configurations = get_additional_configurations(train_dataset)
             model = get_model(config.config['model_args'], config.config['training_args'], additional_configurations=additional_configurations)
             # configure the model based on the dataset
-            model.additional_configurations(train_dataset)
+            #model.additional_configurations(train_dataset)
 
             # Define callbacks
             checkpoint_callback = ModelCheckpoint(
                 dirpath=current_save_folder, filename="{epoch:02d}-{val_loss:.7f}", save_last=True,
                 monitor="val_loss", save_top_k=1, mode="min",
             )
-            early_stopping = EarlyStopping(monitor="val_loss", patience=config.config['training_args']['early_stopping_patience'], mode="min", verbose=False)
+            early_stopping = EarlyStopping(monitor="val_loss", patience=config.config['training_args']['early_stopping_patience'], mode="min", check_on_train_epoch_end=True, verbose=False)
             #custom_progress_bar = CustomProgressBar()
             custom_progress_bar = TQDMProgressBar(refresh_rate=5000)
             callbacks = [checkpoint_callback, early_stopping, custom_progress_bar]
             # logger
             logger = TensorBoardLogger(current_save_folder, sub_dir='', name='', version=0, default_hp_metric=False)
+            logger.log_hyperparams({"placeholder_param": 1})
 
             # train model
             model, callbacks, logger = train_model(model, train_loader, val_loader, callbacks, logger, config.config['training_args'], current_save_folder)
             # save the run info
             run_info = {
                 'save_folder': str(current_save_folder),
-                'best_model_path': callbacks[0].best_model_path,
-                'last_model_path': callbacks[0].last_model_path,
-                'top_k_best_model_paths': callbacks[0].best_k_models,
+                'best_model_path': os.path.relpath(callbacks[0].best_model_path, current_save_folder),
+                'last_model_path': os.path.relpath(callbacks[0].last_model_path, current_save_folder),
+                'top_k_best_model_paths': {
+                    k: os.path.relpath(str(v), current_save_folder) for k, v in callbacks[0].best_k_models.items()
+                },
                 'dataset_config': dataset_config,
                 'training_time': (time.time() - start_time) / 60,  # in minutes,
             }
@@ -170,7 +175,7 @@ def main():
             ### Evaluate model
             # load the model
             model_to_load = 'best_model_path' # ['best_model_path', 'last_model_path']
-            model = load_model_checkpoint(current_save_folder, run_info, model_to_load, config.config)
+            model = load_model_checkpoint(current_save_folder, run_info, model_to_load, config.config, additional_configurations)
 
             # Visualize the training logs
             visualize_logs(current_save_folder / 'version_0')
@@ -193,7 +198,7 @@ def main():
         # Save the split_info using torch.save (CPU-safe by default)
         torch.save(split_info, config.config['save_folder'] / 'split_info.pkl')
 
-        print(f"Run {config.config['experiment_name']} completed")
+        print(f"\n###   Run {config.config['experiment_name']} completed   ###\n")
 
 
         print("\n")

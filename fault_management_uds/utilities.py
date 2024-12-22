@@ -42,19 +42,6 @@ def get_repo_path(repo_name='continuous_heat_atlas'):
         # Update current_path to move up one level
         current_path = parent_path
 
-# data
-def data_folders(repo_path):
-    """
-
-    """
-    data_path = join_path_and_str(repo_path, 'data')
-    # the other
-    external = join_path_and_str(data_path, 'external')
-    interim = join_path_and_str(data_path, 'interim')
-    processed = join_path_and_str(data_path, 'processed')
-    raw = join_path_and_str(data_path, 'raw')
-    return data_path, (external, interim, processed, raw)
-
 
 def seed_everything(seed):
     np.random.seed(seed)

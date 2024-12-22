@@ -1,0 +1,34 @@
+
+
+
+# python fault_management_uds/main.py --config "lstm/complexity.yaml"
+
+
+dataset_args:
+  # Variables
+  engineered_vars: []
+  exogenous_vars: ['5425']
+  endogenous_vars: ['G71F04R_Level2']
+
+  # Prioritization
+  rain_event_priority: 1
+  # Data transformation
+  function_transform_type: 'none'
+  # Normalization
+  scaler_type: 'min-max'
+  # Data Augmentation
+  noise_injection: false
+
+
+model_args:
+  model_name: 'LSTM'
+  hidden_size: 64
+  num_layers: 2
+
+
+training_args:
+  lr: 0.0005
+  max_epochs: 100
+  loss_function: 'MSELoss'
+
+

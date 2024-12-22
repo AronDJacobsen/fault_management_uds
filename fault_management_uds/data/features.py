@@ -34,26 +34,26 @@ def add_rain_event_priority(data, dataset_args):
 
 
 def add_feature_engineering(data, dataset_args):
-    if ('sin_time' in dataset_args['engineered_vars']) and ('cos_time' in dataset_args['engineered_vars']):
-        sin_time, cos_time = cyclic_time_of_day(data)
-        data['sin_time'], data['cos_time'] = sin_time, cos_time
-    if ('sin_day' in dataset_args['engineered_vars']) and ('cos_day' in dataset_args['engineered_vars']):
-        sin_day, cos_day = cyclic_day_of_week(data)
-        data['sin_day'], data['cos_day'] = sin_day, cos_day
+    if ('sin_tod' in dataset_args['engineered_vars']) and ('cos_tod' in dataset_args['engineered_vars']):
+        sin_tod, cos_tod = cyclic_time_of_day(data)
+        data['sin_tod'], data['cos_tod'] = sin_tod, cos_tod
+    if ('sin_dow' in dataset_args['engineered_vars']) and ('cos_dow' in dataset_args['engineered_vars']):
+        sin_dow, cos_dow = cyclic_day_of_week(data)
+        data['sin_dow'], data['cos_dow'] = sin_dow, cos_dow
     return data
 
 def cyclic_time_of_day(data):
     # add cyclical time of day features on a minute scale
     normalized_time = (data.index.hour + data.index.minute/60) / 24 # range [0, 1]
-    sin_time = np.sin(2 * np.pi * normalized_time) + 1 # range [0, 2]
-    cos_time = np.cos(2 * np.pi * normalized_time) + 1 # range [0, 2]
+    sin_time = np.sin(2 * np.pi * normalized_time) + 1 # range [0, 2] for positive values
+    cos_time = np.cos(2 * np.pi * normalized_time) + 1 # range [0, 2] for positive values
     return sin_time, cos_time
 
 def cyclic_day_of_week(data):
     # add cyclical day of week features
-    normalized_day = data.index.dayofweek / 7
-    sin_day = np.sin(2 * np.pi * normalized_day) + 1 # range [0, 2]
-    cos_day = np.cos(2 * np.pi * normalized_day) + 1 # range [0, 2]
+    normalized_day = data.index.dayofweek / 6 # range [0, 1], Monday=0, Sunday=6
+    sin_day = np.sin(2 * np.pi * normalized_day) + 1 # range [0, 2] for positive values
+    cos_day = np.cos(2 * np.pi * normalized_day) + 1 # range [0, 2] for positive values
     return sin_day, cos_day
 
 

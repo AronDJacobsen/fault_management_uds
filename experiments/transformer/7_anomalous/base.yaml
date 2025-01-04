@@ -49,7 +49,7 @@ training_args:
   lr: 0.0005 # range
   max_epochs: 18 # range
   scheduler: true
-  early_stopping_patience: 8 # set to half of max_epochs
+  early_stopping_patience: 18 # set to half of max_epochs
   batch_size: 32 # range
 
   loss_function: 'MSELoss' # maybe test? focus on hard to predict events

@@ -1,0 +1,18 @@
+
+
+hparam_key_paths:
+  - 'name'
+name: '1_iteration'
+
+
+
+dataset_args:
+  data_group: 'anomalous'
+
+
+training_args:
+  lr: 2e-5               # Lower learning rate for fine-tuning
+  max_epochs: 5          # Adjusted epochs for fine-tuning
+  scheduler: true
+  model_to_load: 'last_model_path' # ['best_model_path', 'last_model_path']
+

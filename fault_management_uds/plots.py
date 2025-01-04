@@ -231,7 +231,7 @@ def loading_plot(coeff, labels, scale=1, colors=None, visible=None, ax=plt, arro
                 )
 
 
-def pca_plot(pca_df, x, y, explained_variance, hue_col, hue_map, plot_loadings=False, loadings=None):
+def pca_plot(pca_df, x, y, explained_variance, hue_col, hue_map, plot_loadings=False, loadings=None, save_folder=None):
 
 
     # Desired hue order
@@ -264,7 +264,85 @@ def pca_plot(pca_df, x, y, explained_variance, hue_col, hue_map, plot_loadings=F
     plt.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=len(hue_map),
                markerscale=2
     )
+    if save_folder == None:
+        plt.show()
+    else:
+        plt.savefig(save_folder / f'pca_{x}_{y}.png')
 
-    plt.show()
 
+
+
+def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True):
+    norm = Normalize(vmin=data.min(), vmax=data.max())
+    cmap = plt.get_cmap(cmap)
+    
+    for i in range(data.shape[0]):  # Iterate over rows
+        for j in range(data.shape[1]):  # Iterate over columns
+            value = data[i, j]
+            is_max = value == data[i].max() if high_best else value == data[i].min()
+            text_kwargs = {"weight": "bold"} if is_max else {}
+            
+            # Get the background color for the cell
+            bg_color = cmap(norm(value))
+            
+            # Determine text color (white or black) based on brightness
+            brightness = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
+            text_color = "white" if brightness < 0.80 else "black"
+            
+            # Add text annotation
+            str_value = data_fmt[i, j]
+            ax.text(j + 0.5, i + 0.5, str_value, ha="center", va="center", color=text_color, **text_kwargs)
+
+
+
+def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best=True, figsize=(10, 3), save_folder=None):
+
+    # Prepare the data
+    data_fmt = data.to_numpy().round(round_to).astype(str)
+    if suffix is not None:
+        # add a % sign to each value
+        data_fmt = np.char.add(data_fmt, suffix)
+
+    # Create the heatmap
+    plt.figure(figsize=figsize)
+    ax = sns.heatmap(data, annot=False, cmap=cmap, cbar=False)
+    annotate_heatmap(data.to_numpy(), data_fmt, ax=ax, cmap=cmap, high_best=high_best)
+    # format
+    ax.yaxis.get_major_ticks()[-1].label1.set_fontweight('bold')
+    ax.yaxis.get_major_ticks()[-2].label1.set_fontweight('bold')
+    plt.gca().invert_yaxis()
+    plt.gca().xaxis.set_ticks_position('top')
+    plt.xticks(fontsize=12)
+    plt.gca().xaxis.set_tick_params(size=0)
+    plt.tight_layout()
+    if save_folder == None:
+        plt.show()
+    else:
+        plt.savefig(save_folder / f'metric_{metric}.png')
+
+
+
+def visualize_confusion(ax, i, conf_matrix, fmt, cmap):
+    sns.heatmap(conf_matrix, annot=True, fmt=fmt, cmap=cmap, cbar=False, ax=ax)
+    ax.set_title(key, fontsize=14)
+    if i == 0:
+        ax.set_ylabel('Actual', fontsize=12)
+        ax.set_xlabel('Predicted', fontsize=12)
+    # set y and x ticks
+    ax.set_xticklabels(['Normal', 'Anomaly'], fontsize=10)
+    ax.set_yticklabels(['Normal', 'Anomaly'], fontsize=10)
+    return ax
+
+
+def visualize_roc_auc(ax, i, fpr, tpr, roc_auc):
+    ax.plot(fpr, tpr, color='darkorange', lw=2, label='AUC: %0.2f' % roc_auc)
+    ax.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    if i == 0:
+        ax.set_ylabel('TPR', fontsize=12)
+        ax.set_xlabel('FPR', fontsize=12)
+    ax.legend(loc='lower right')
+    ax.set_title(' ', fontsize=1)
+    return ax
 

@@ -28,11 +28,11 @@ source /work3/s194262/thesis/bin/activate
 cd /work3/s194262/GitHub/fault_management_uds
 
 # Training:
-#python fault_management_uds/main.py --config "transformer/7_anomalous/hold_out_endo.yaml" --num_workers 0
+#python fault_management_uds/train.py --config "transformer/7_anomalous/hold_out_endo.yaml" --num_workers 0
 
 # Evaluation:
-python fault_management_uds/get_outputs.py --model_save_path "transformer/7_anomalous/name=1_iteration_250101_2145" --data_type "test" --data_group "anomalous" --num_workers 0
+python fault_management_uds/get_outputs.py --model_save_path "transformer/7_anomalous/name=1_iteration_250101_2145" --data_types ["test"] --data_group "anomalous" --num_workers 0
 
 # Iteration:
-#python fault_management_uds/main.py --config "transformer/7_anomalous/hold_out_endo.yaml" --num_workers 0
+#python fault_management_uds/train.py --config "transformer/7_anomalous/hold_out_endo.yaml" --num_workers 0
 

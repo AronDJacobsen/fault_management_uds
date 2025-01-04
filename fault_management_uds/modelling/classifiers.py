@@ -72,3 +72,43 @@ def classify_rain_events(rain_data, min_event_duration=30, min_event_rainfall=10
     return pd.DataFrame(events)
 
 
+
+# Function to select and apply the anomaly detection model
+def detect_anomalies(model_name, data, contamination='auto', n_neighbors=20, random_state=42):
+    if model_name == 'IsolationForest':
+        model = IsolationForest(
+            contamination=contamination, 
+            random_state=random_state
+        )
+        model.fit(data)
+        predictions = model.predict(data)
+        decision_function = model.decision_function(data)
+        predictions = np.array([1 if x == -1 else 0 for x in predictions])
+        return predictions, -decision_function
+
+    elif model_name == 'OneClassSVM':
+        model = OneClassSVM(
+            #nu=contamination,  # Proportion of outliers
+            kernel="rbf",  # Radial basis function kernel
+            gamma="scale",  # Kernel coefficient
+        )
+        model.fit(data)
+        predictions = model.predict(data)
+        predictions = np.array([1 if x == -1 else 0 for x in predictions])
+        return predictions, None  # One-Class SVM doesn't have a decision function like Isolation Forest
+
+    elif model_name == 'LOF':
+        model = LocalOutlierFactor(
+            n_neighbors=n_neighbors,
+            contamination=contamination, 
+            novelty=False
+        )
+        lof_scores = model.fit_predict(data)
+        predictions = np.array([1 if x == -1 else 0 for x in lof_scores])
+        negative_outlier_factor = -model.negative_outlier_factor_
+        return predictions, negative_outlier_factor
+
+    else:
+        raise ValueError(f"Model {model_name} is not recognized. Choose 'IsolationForest', 'OneClassSVM', or 'LOF'.")
+
+

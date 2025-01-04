@@ -43,7 +43,7 @@ builtins.tqdm = lambda *args, **kwargs: tqdm(*args, **{**tqdm_kwargs, **kwargs})
 def parse_args():
     parser = argparse.ArgumentParser(description='Fault Management UDS')
     parser.add_argument('--model_save_path', type=str, default='transformer/7_anomalous/1_iteration', help='Folder where the model is saved')
-    parser.add_argument('--data_type', type=str, default='test', help='Data type to evaluate on', choices=['train', 'val', 'test'])
+    parser.add_argument('--data_types', type=list, default=['test'], help='Select data types to run')
     parser.add_argument('--data_group', type=str, default='anomalous', help='Data group to evaluate on', choices=['clean', 'anomalous'])
     parser.add_argument('--fast_run', type=bool, default=False, help='Quick run')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for data loading')
@@ -214,7 +214,7 @@ def main():
     args = parse_args()
 
     model_save_path = args.model_save_path
-    data_type = args.data_type
+    data_types = args.data_types
     data_group = args.data_group
     fast_run = args.fast_run
     num_workers = args.num_workers
@@ -223,39 +223,43 @@ def main():
     # handle fast run
     subset = 5000 if fast_run else None
     
+    # iterate the selected datatypes
+    for data_type in data_types:
 
-    # load run info
-    config, run_folder, data_indices, scalers, run_info = load_run_info(model_save_path, data_type, subset=subset)
+        # load run info
+        config, run_folder, data_indices, scalers, run_info = load_run_info(model_save_path, data_type, subset=subset)
 
-    # define save folder
-    outputs_folder = run_folder / 'anomalous'
-    outputs_folder.mkdir(parents=True, exist_ok=True)
+        # define save folder
+        outputs_folder = run_folder / 'anomalous'
+        outputs_folder.mkdir(parents=True, exist_ok=True)
 
-    # Load data
-    data = load_data([None, None], config['dataset_args']['data_file_path'], config['dataset_args'], 
-                     data_type=data_type,
-                     data_group=data_group,
-                     )
-    dataset = get_sensor_dataset(data, config['dataset_args'], data_indices, scalers, dataset_type=data_type, verbose=False)
-    del data
-
-
-    # load the model
-    additional_configurations = get_additional_configurations(dataset)
-    model_to_load = config['training_args']['model_to_load']
-    model = load_model_checkpoint(run_folder, run_info, model_to_load, config, additional_configurations)
+        # Load data
+        data = load_data([None, None], config['dataset_args']['data_file_path'], config['dataset_args'], 
+                        data_type=data_type,
+                        data_group=data_group,
+                        )
+        dataset = get_sensor_dataset(data, config['dataset_args'], data_indices, scalers, dataset_type=data_type, verbose=False)
+        del data
 
 
-    # get the outputs
-    outputs, column_2_idx = get_outputs(model, dataset, scalers, config)
+        # load the model
+        additional_configurations = get_additional_configurations(dataset)
+        model_to_load = config['training_args']['model_to_load']
+        model = load_model_checkpoint(run_folder, run_info, model_to_load, config, additional_configurations)
 
 
-    # save the results as pickle
-    with open(outputs_folder / 'outputs.pkl', 'wb') as f:
-        pickle.dump(outputs, f)
-    # save the column mapping as json
-    with open(outputs_folder / 'column_2_idx.json', 'w') as f:
-        json.dump(column_2_idx, f)
+        # get the outputs
+        outputs, column_2_idx = get_outputs(model, dataset, scalers, config)
+
+        results_save_path = outputs_folder / data_type
+        results_save_path.mkdir(parents=True, exist_ok=True)
+
+        # save the results as pickle
+        with open(results_save_path / f'outputs.pkl', 'wb') as f:
+            pickle.dump(outputs, f)
+        # save the column mapping as json
+        with open(results_save_path / f'column_2_idx.json', 'w') as f:
+            json.dump(column_2_idx, f)
 
 
 

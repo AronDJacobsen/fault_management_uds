@@ -27,6 +27,6 @@ source /work3/s194262/thesis/bin/activate
 
 cd /work3/s194262/GitHub/fault_management_uds
 
-python fault_management_uds/main.py --config "transformer/testing.yaml" --num_workers 0
+python fault_management_uds/train.py --config "transformer/testing.yaml" --num_workers 0
 
 

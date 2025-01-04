@@ -1,0 +1,14 @@
+
+
+
+hparam_key_paths:
+  - 'model_args/hidden_size'
+  - 'model_args/num_heads'
+  - 'model_args/num_layers'
+
+
+
+model_args:
+  hidden_size: 128
+  num_heads: 2
+  num_layers: 4

@@ -9,7 +9,7 @@ anomalies:
     # Medium spike
     medium:
       # proportion of data to be injected with anomaly in percentage
-      proportion: 0.0001
+      proportion: 0.0003
       # Duration is in minutes
       duration:
         # sample durations from a normal distribution
@@ -21,8 +21,8 @@ anomalies:
       magnitude:
         sign: + # +, - or +-
         range:
-          min: 0.01
-          max: 0.02
+          min: 0.03
+          max: 0.05
 
   # -----------------
   noise:
@@ -30,22 +30,22 @@ anomalies:
       proportion: 0.002
       duration:
         normal:
-          mean: 60
-          std: 15 
+          mean: 45
+          std: 10
       # magnitude is the standard deviation of the noise
       magnitude:
         sign: +
         range:
-          min: 0.005
-          max: 0.005
+          min: 0.01
+          max: 0.01
 
   # -----------------
   frozen:
     medium:
-      proportion: 0.005
+      proportion: 0.01
       duration:
         normal:
-          mean: 120
+          mean: 540
           std: 30
       # not required for frozen, set to null
       magnitude:

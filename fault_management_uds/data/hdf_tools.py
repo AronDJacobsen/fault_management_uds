@@ -89,6 +89,10 @@ def save_dataframe_in_HDF5(data_file_path, group_path, data_name, df):
     # HDF storage
     df = df.copy()
 
+    # if time is index then move it to a column
+    if df.index.name == 'time':
+        df = df.reset_index(drop=False)
+
     # handle data for the HDF5 file
     df['time'] = df['time'].astype('int64')
     
@@ -128,6 +132,8 @@ def load_dataframe_from_HDF5(data_file_path, group_path, starttime=None, endtime
                     raise ValueError(f"Invalid columns: {invalid_cols}. Available columns: {all_columns}")
                 # Get the indices of the selected columns
                 column_indices = [np.where(all_columns == col)[0][0] for col in columns]
+                column_indices = sorted(column_indices)
+
             else:
                 column_indices = slice(None)  # Select all columns
             

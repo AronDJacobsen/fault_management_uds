@@ -1,0 +1,17 @@
+
+
+
+# python fault_management_uds/main.py --config "3_training_parameters/lr_scheduler.yaml" --fast_run True
+
+
+hparam_key_paths:
+  - 'training_args/max_epochs'
+  - 'training_args/lr'
+  - 'training_args/scheduler'
+
+
+training_args:
+  max_epochs: 16 # estimated number of epochs
+  lr: 0.0005 # max learning rate
+  scheduler: true
+  early_stopping_patience: 8 # set to half of max_epochs

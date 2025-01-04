@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import matplotlib.dates as mdates
 from datetime import timedelta
+import seaborn as sns
 
 import os
 import tensorflow as tf
@@ -137,7 +138,7 @@ def visualize_logs(logdir):
             else:
                 logs[v.tag] = [(e.step, v.simple_value)]
     print(f"Loggers: {logs.keys()}")
-    tags = ['train_loss_step', 'train_loss_epoch', 'val_loss']
+    tags = ['train_loss_epoch', 'val_loss']
 
     # Plot the logs
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -203,5 +204,67 @@ def set_meaningful_xticks(ax, start, end):
         ax.tick_params(axis='x', which='major', labelsize=10, rotation=0, pad=5.5)
     return ax
 
+
+
+
+
+def loading_plot(coeff, labels, scale=1, colors=None, visible=None, ax=plt, arrow_size=0.5):
+    # Plot the loadings
+    for i, label in enumerate(labels):
+        if visible is None or visible[i]:
+            ax.arrow(
+                0,
+                0,
+                coeff[i, 0] * scale,
+                coeff[i, 1] * scale,
+                head_width=arrow_size * scale,
+                head_length=arrow_size * scale,
+                color="#000" if colors is None else colors[i],
+                )
+            ax.text(
+                coeff[i, 0] * 1.4 * scale,
+                coeff[i, 1] * 1.4 * scale,
+                label,
+                color="#000" if colors is None else colors[i],
+                ha="center",
+                va="center",
+                )
+
+
+def pca_plot(pca_df, x, y, explained_variance, hue_col, hue_map, plot_loadings=False, loadings=None):
+
+
+    # Desired hue order
+    hue_order = hue_map.keys()
+    hue_order = list(hue_order)[::-1]
+
+    # Example figure setup
+    plt.figure(figsize=(9, 4))
+    # Sort the data using np.vectorize to enforce order
+    g = sns.scatterplot(
+        data=pca_df.sort_values(hue_col, key=np.vectorize(hue_order.index)),  # Sort by hue_order index
+        x=x, y=y, hue=hue_col, 
+        hue_order=hue_order,  # Explicitly set hue_order
+        palette=hue_map, alpha=0.6, s=5
+    )
+
+
+    # Add loadings
+    if plot_loadings:
+        loading_plot(loadings[[x, y]].values, loadings.index, scale=2, arrow_size=0.08)
+
+    # Add variance explained by the
+    g.set_xlabel(f"{x} ({explained_variance[0]*100:.2f}%)")
+    g.set_ylabel(f"{y} ({explained_variance[1]*100:.2f}%)")
+
+    # Reverse the legend
+    handles, labels = plt.gca().get_legend_handles_labels()
+    handles = handles[::-1]
+    labels = labels[::-1]
+    plt.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=len(hue_map),
+               markerscale=2
+    )
+
+    plt.show()
 
 

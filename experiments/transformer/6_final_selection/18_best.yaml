@@ -1,0 +1,16 @@
+
+
+
+hparam_key_paths:
+  - 'training_args/max_epochs'
+  - 'training_args/model_to_load'
+
+
+training_args:
+  max_epochs: 18 # range
+  early_stopping_patience: 18 # avoid stopping early
+
+  model_to_load: 'best_model_path' # ['best_model_path', 'last_model_path']
+
+
+

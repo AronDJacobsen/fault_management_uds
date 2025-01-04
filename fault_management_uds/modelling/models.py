@@ -136,7 +136,6 @@ class LightningModel(pl.LightningModule):
     def handle_dynamic_weighting(self, loss, previous, targets):
         # Calculate the dynamic weighting; assign higher weights to larger differences
         dynamic_weighting = torch.abs(targets - previous)
-        #scaled_weighting = torch.log1p(torch.abs(targets - previous))  # log(1 + x)
 
         # Multiply the loss by the dynamic weighting
         loss = loss * (1 + dynamic_weighting)
@@ -313,6 +312,7 @@ class LSTMModel(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.output_size = output_size
         self.predict_difference = predict_difference
         self.endogenous_idx = endogenous_idx
 
@@ -408,8 +408,12 @@ class TransformerModel(nn.Module):
         
         # Fully connected layer to map transformer output to desired output size
         self.fc = nn.Linear(hidden_size, output_size)
+        # name to dim
+        self.returns = {
+            'prediction': output_size,
+            'final_hidden': hidden_size
+        }
 
-        self.returns = ['prediction', 'final_hidden']
 
     def forward(self, x):
         # Embed the input and add positional encoding

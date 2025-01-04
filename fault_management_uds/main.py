@@ -17,7 +17,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, TQDMProg
 from pytorch_lightning.loggers import TensorBoardLogger
 
 
-from fault_management_uds.config import Config
+from fault_management_uds.config import Config, get_additional_configurations
 from fault_management_uds.utilities import folder_cleanup, seed_everything
 from fault_management_uds.data.dataset import load_data, get_datasets, handle_splits, identify_valid_indices
 from fault_management_uds.modelling.models import get_model, load_model_checkpoint
@@ -36,31 +36,6 @@ tqdm_kwargs = {'mininterval': 60.0}  # Updates every _ seconds
 # Replace the tqdm function globally with pre-configured options
 import builtins
 builtins.tqdm = lambda *args, **kwargs: tqdm(*args, **{**tqdm_kwargs, **kwargs})
-
-
-# # Define a custom progress bar
-# class CustomProgressBar(TQDMProgressBar):
-#     def init_train_tqdm(self):
-#         bar = super().init_train_tqdm()
-#         bar.mininterval = 60.0  # Updates every 60 seconds
-#         return bar
-
-#     def init_validation_tqdm(self):
-#         bar = super().init_validation_tqdm()
-#         bar.mininterval = 60.0  # Updates every 60 seconds
-#         return bar
-    
-
-
-def get_additional_configurations(dataset):
-    additional_configurations = {}
-    # mean
-    additional_configurations['target_mean'] = dataset.data[dataset.valid_indices, dataset.endogenous_idx].mean()
-    # endogenous_idx
-    additional_configurations['endogenous_idx'] = dataset.endogenous_idx
-    # the number of data points
-    additional_configurations['n_obs'] = len(dataset)
-    return additional_configurations
 
 
 
@@ -86,6 +61,7 @@ def main():
     # # Clean up folders
     # folder_cleanup(MODELS_DIR)
     # folder_cleanup(config.experiment_folder)
+    
     # Create experiment folder if it does not exist
     if not os.path.exists(config.experiment_folder):
         os.makedirs(config.experiment_folder)
@@ -105,7 +81,10 @@ def main():
 
 
         ### Load data
-        data = load_data([None, None], config.config['dataset_args']['data_file_path'], config.config['dataset_args'], data_type='complete')
+        data = load_data([None, None], config.config['dataset_args']['data_file_path'], config.config['dataset_args'], 
+                         data_type='complete',
+                         data_group=config.config['dataset_args']['data_group']
+                         )
         data = data if not args.fast_run else data.iloc[:3000]
         n_obs = len(data)
 
@@ -173,8 +152,8 @@ def main():
 
 
             ### Evaluate model
-            # load the model
-            model_to_load = 'best_model_path' # ['best_model_path', 'last_model_path']
+            # load the model: ['best_model_path', 'last_model_path']
+            model_to_load = config.config['training_args']['model_to_load']
             model = load_model_checkpoint(current_save_folder, run_info, model_to_load, config.config, additional_configurations)
 
             # Visualize the training logs

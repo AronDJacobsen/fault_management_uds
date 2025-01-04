@@ -1,0 +1,61 @@
+
+
+
+# python fault_management_uds/main.py --config "lstm/complexity.yaml"
+hparam_key_paths:
+  - 'name'
+name: 'base'
+
+dataset_args:
+  ### Variables
+
+  # Engineered variables; notice relation between 'engineered' and 'endogenous_vars'
+  # todo: maybe dom later?
+  engineered: 'time_of_day' # ['time_of_day', 'day_of_week', 'tod_and_dow']
+  engineered_vars: ['sin_tod', 'cos_tod'] # [sin_tod, cos_tod, sin_dow, cos_dow]
+
+  # Upstream and downstream variables; include in exogenous_vars
+  upstream: 'G71F05R_LevelInlet' # ['G71F05R_LevelInlet']
+  downstream: 'G71F06R_LevelInlet' # ['G71F06R_LevelInlet']
+  exogenous_vars: ['5425', 'G71F05R_LevelInlet', 'G71F06R_LevelInlet']
+
+  # Target variable
+  endogenous_vars: ['G71F04R_Level2']
+
+  hold_out_vars: []
+
+  # Prioritization
+  rain_event_priority: 4 # range
+  # Data transformation
+  function_transform_type: 'none' # ['log', 'sqrt', 'none']
+  # Normalization
+  scaler_type: 'min-max' # ['min-max', 'standard']
+  # Data Augmentation
+  noise_injection: false # [true, false]
+
+
+model_args:
+  model_name: 'Transformer'
+  hidden_size: 64 # range
+  num_heads: 2 # range
+  num_layers: 4 # range
+  dropout: 0.3 # range
+  predict_difference: true # [true, false]
+
+  positional_encoding: false # [true, false]
+  aggregate_hidden: false # [true, false]
+
+training_args:
+  lr: 0.0005 # range
+  max_epochs: 18 # range
+  scheduler: true
+  early_stopping_patience: 8 # set to half of max_epochs
+  batch_size: 32 # range
+
+  loss_function: 'MSELoss' # maybe test? focus on hard to predict events
+  
+  dynamic_weighting: true # [true, false]
+  directional_errors: 2.0 # [true, false]
+
+
+  model_to_load: 'best_model_path' # ['best_model_path', 'last_model_path']

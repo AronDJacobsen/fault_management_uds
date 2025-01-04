@@ -219,11 +219,12 @@ class Config:
     Class to store configuration parameters
     """
     def __init__(self, config_path, fast_run=False, save_folder=None, num_workers=0):
-        # Define experiment folder
+        # Define experiment folder; given 'transformer/2_data_features/test.yaml' we want 'transformer/2_data_features'
+        self.relative_path = '/'.join(config_path.split('/')[:-1])
         if save_folder is not None:
-            self.experiment_folder = save_folder / config_path.split('/')[0].split('.')[0]
+            self.experiment_folder = save_folder / self.relative_path # config_path.split('/')[0].split('.')[0]
         else:
-            self.experiment_folder = MODELS_DIR / config_path.split('/')[0].split('.')[0]
+            self.experiment_folder = MODELS_DIR / self.relative_path # config_path.split('/')[0].split('.')[0]
         os.makedirs(self.experiment_folder, exist_ok=True)
         self.num_workers = num_workers
         
@@ -251,7 +252,7 @@ class Config:
         self.config['dataset_args']['data_file_path'] = PROCESSED_DATA_DIR / 'Bellinge.h5'
         self.config['dataset_args']['variable_list'] = self.config['dataset_args']['engineered_vars'] + self.config['dataset_args']['exogenous_vars'] + self.config['dataset_args']['endogenous_vars']
         self.config['dataset_args']['data_variables'] = self.config['dataset_args']['exogenous_vars'] + self.config['dataset_args']['endogenous_vars']
-        self.config['model_args']['input_size'] = len(self.config['dataset_args']['variable_list'])
+        self.config['model_args']['input_size'] = len(self.config['dataset_args']['variable_list']) - len(self.config['dataset_args']['hold_out_vars'])
         self.config['model_args']['output_size'] = len(self.config['dataset_args']['endogenous_vars'])
 
 
@@ -351,7 +352,19 @@ class Config:
         # Save as yaml
         with open(save_folder / 'config.yaml', 'w') as f:
             yaml.dump(self.config, f, default_flow_style=False)
-            
+
+
+
+def get_additional_configurations(dataset):
+    additional_configurations = {}
+    # mean
+    additional_configurations['target_mean'] = dataset.data[dataset.valid_indices, dataset.endogenous_idx].mean()
+    # endogenous_idx
+    additional_configurations['endogenous_idx'] = dataset.endogenous_idx
+    # the number of data points
+    additional_configurations['n_obs'] = len(dataset)
+    return additional_configurations
+  
 
 
 

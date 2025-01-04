@@ -149,6 +149,7 @@ class SensorDataset(Dataset):
         # store the columns, and timestamps
         self.columns = np.array(columns)
         self.timestamps = np.array(timestamps).astype(str)
+        self.n_obs = len(self.data) 
         self.valid_timestamps = pd.to_datetime(self.timestamps[self.valid_indices.cpu().numpy()])
 
         # store the independent and dependent variables
@@ -158,6 +159,14 @@ class SensorDataset(Dataset):
         self.exogenous_idx = np.array([self.columns.tolist().index(var) for var in self.exogenous_vars])
         self.endogenous_vars = dataset_args.get('endogenous_vars', [])
         self.endogenous_idx = np.array([self.columns.tolist().index(var) for var in self.endogenous_vars])
+
+        # get the input idxs
+        self.input_columns = self.engineered_vars + self.exogenous_vars + self.endogenous_vars
+        self.input_columns = [var for var in self.input_columns if var in self.columns]
+        # remove any based on held out variables
+        self.input_columns = [var for var in self.input_columns if var not in dataset_args.get('hold_out_vars', [])]
+        # sort by the order of the columns
+        self.input_idx = [self.columns.tolist().index(var) for var in self.input_columns]
 
         self.noise_injection = dataset_args.get('noise_injection', False) if self.dataset_type == 'train' else False
 
@@ -196,24 +205,27 @@ class SensorDataset(Dataset):
         # the index is the starting point of the sequence (valid idx)
         y = self.data[idx, self.endogenous_idx]  # Dependent variable at next timestep
         mask = self.not_nan_mask[idx, self.endogenous_idx]  # Mask value
-        starttime = self.timestamps[idx]  # Timestamp of the next step
+        #starttime = self.timestamps[idx]  # Timestamp of the next step
 
         # Get the sequence of data
-        x = self.data[idx - self.sequence_length:idx]      
+        x = self.data[idx - self.sequence_length:idx, self.input_idx] 
         # Optionally, add slight noise to x (if re-enabled)
         x += torch.randn_like(x) * 1e-6 if self.noise_injection else 0
-        return x, y, mask, starttime
+        return x, y, mask, idx
 
 
 
 
-def identify_valid_indices(not_nan_mask, sequence_length, steps_ahead=1):
+def identify_valid_indices(valid_mask, window_back, window_ahead):
+        
+        
+        #not_nan_mask, sequence_length, steps_ahead=1):
     """
     Extracts valid sequences based on the specified sequence length and steps ahead.
     A valid sequence has no NaN values.
     
     Parameters:
-    - not_nan_mask (Tensor): Boolean tensor where True indicates a valid value.
+    - valid_mask (Tensor): Boolean tensor where True indicates a valid value.
     - sequence_length (int): Length of the sequence window to evaluate.
     - steps_ahead (int): Additional steps to evaluate after the sequence.
 
@@ -221,17 +233,21 @@ def identify_valid_indices(not_nan_mask, sequence_length, steps_ahead=1):
     - valid_window_mask (Tensor): Boolean tensor where True indicates a valid window.
     """
     device = get_accelerator(verbose=False)
+
+    # Ensure valid mask is a tensor
+    valid_mask = torch.tensor(valid_mask, dtype=torch.bool).to(device)
+
     # Ensure input is boolean and handle multi-dimensional data
-    if not_nan_mask.ndim > 1:
-        not_nan_mask = not_nan_mask.all(dim=1)
+    if valid_mask.ndim > 1:
+        valid_mask = valid_mask.all(dim=1)
     
     # Compute rolling window length
-    rolling_window_length = sequence_length + steps_ahead
+    rolling_window_length = window_back + window_ahead
 
     # Convolve with a kernel of ones to identify valid windows
     kernel = torch.ones(1, 1, rolling_window_length, dtype=torch.float32).to(device)
     valid_window_mask = torch.nn.functional.conv1d(
-        not_nan_mask.float().view(1, 1, -1),  # Input signal
+        valid_mask.float().view(1, 1, -1),  # Input signal
         weight=kernel,
         stride=1
     ).squeeze(0).squeeze(0) # Remove batch and channel dimensions
@@ -250,17 +266,17 @@ def identify_valid_indices(not_nan_mask, sequence_length, steps_ahead=1):
     # Identify valid indices
     valid_indices = torch.where(valid_window_mask)[0]
     # Shift indices to the start of the sequence
-    valid_indices -= steps_ahead - 1
+    valid_indices -= window_ahead - 1
 
     return valid_indices
 
 
 
 
-def load_data(timestamps, data_file_path, dataset_args, data_type='train'):
+def load_data(timestamps, data_file_path, dataset_args, data_type='train', data_group='clean'):
     # load the data
     starttime, endtime = timestamps[0], timestamps[-1]
-    data, _, _, _ = load_dataframe_from_HDF5(data_file_path, "combined_data/clean", columns=dataset_args['data_variables'], starttime=starttime, endtime=endtime, complete_range=True)
+    data, _, _, _ = load_dataframe_from_HDF5(data_file_path, f"combined_data/{data_group}", columns=dataset_args['data_variables'], starttime=starttime, endtime=endtime, complete_range=True)
 
     # only include valid endogenous variables
     if data_type == 'complete':

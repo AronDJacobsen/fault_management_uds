@@ -12,6 +12,8 @@ dataset_args:
   exogenous_vars: ['5425']
   endogenous_vars: ['G71F04R_Level2']
 
+  hold_out_vars: []
+
   precision: 3
   obvious_min: 0.001
 
@@ -26,12 +28,14 @@ dataset_args:
   # Data Augmentation
   noise_injection: false
 
+
   # Splitting
   n_splits: 1
   train_split: 0.7
   val_split: 0.15
   test_split: 0.15
   steps_ahead: 1
+  data_group: 'clean'
 
 training_args:
   lr: 0.0005
@@ -52,6 +56,7 @@ training_args:
   dynamic_weighting: false # [true, false]
   directional_errors: false # [true, false]
 
+  model_to_load: 'best_model_path' # ['best_model_path', 'last_model_path']
 
 model_args:
   model_name: 'LSTM'

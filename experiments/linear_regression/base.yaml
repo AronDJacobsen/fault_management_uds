@@ -1,0 +1,25 @@
+
+
+
+
+dataset_args:
+  ### Variables
+  engineered: 'none' # ['time_of_day', 'day_of_week', 'tod_and_dow']
+  exogenous_vars: ['5425']
+
+  # Target variable
+  endogenous_vars: ['G71F04R_Level2']
+
+
+model_args:
+  model_name: 'LinearRegression'
+  num_layers: 1 # (not used)
+
+
+training_args:
+  lr: 0.0001 # range
+  max_epochs: 100
+  loss_function: 'MSELoss' # maybe test? focus on hard to predict events
+
+
+

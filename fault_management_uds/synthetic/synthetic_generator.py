@@ -47,7 +47,7 @@ class AnomalyGenerator:
 
     def inject_frozen(self, time_series, value_col_idx, start_idx, end_idx, duration, magnitude):
         """Inject a frozen anomaly (constant value)."""
-        frozen_value = time_series.iloc[start_idx]
+        frozen_value = time_series.iloc[start_idx, value_col_idx]
         time_series.iloc[start_idx:end_idx, value_col_idx] = frozen_value
         return time_series
 
@@ -101,7 +101,7 @@ class AnomalyHandler:
         self.n_obs = n_obs
         self.anomaly = anomaly
         self.seed = seed
-        self.value_col = value_col
+        self.value_col = value_col if isinstance(value_col, str) else value_col[0]
 
 
         # The minimum gap between anomalies
@@ -224,14 +224,31 @@ class AnomalyHandler:
 
         max_duration = max(self.durations)
         
-        # Available indices to place anomalies
+        # Available indices to place anomalies        
         if self.available_indices is not None:
-            available_indices = list(range(self.edge_buffer, self.n_obs - self.edge_buffer))
-        else:
             # User defined available indices, adjust to handle interruptions
             available_indices, _ = find_unterrupted_sequences(self.available_indices, max_duration)
             # handle edge wrt max duration
-            available_indices = available_indices[-max_duration]
+            available_indices = available_indices[:-max_duration]
+
+        else:
+            available_indices = list(range(self.edge_buffer, self.n_obs - self.edge_buffer))
+
+        
+        # handle cases if the edge buffer is in the available indices
+        if self.edge_buffer-1 in available_indices:
+            print("Edge buffer is in available indices.")
+            # remove indices up to the edge buffer
+            edge_idx = available_indices.index(self.edge_buffer-1)
+            available_indices = available_indices[edge_idx+1:]
+        # same for the last index
+        if self.n_obs - self.edge_buffer in available_indices:
+            print("Last index is in available indices.")
+            # remove indices up to the edge buffer
+            edge_idx = available_indices.index(self.n_obs - self.edge_buffer)
+            available_indices = available_indices[:edge_idx]
+
+
 
 
         if not available_indices:

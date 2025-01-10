@@ -1,10 +1,12 @@
+import yaml
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import pytorch_lightning as pl
 
 from fault_management_uds.utilities import get_accelerator
-
+from fault_management_uds.config import MODELS_DIR
 
 from .loss import get_loss
 
@@ -88,7 +90,7 @@ def get_model(model_args, training_args, checkpoint_path=None, additional_config
     # Create a PyTorch Lightning model
     lightning_model = LightningModel(
         model, criterion, 
-        learning_rate=training_args['lr'], 
+        learning_rate=float(training_args['lr']), 
         seed=training_args['seed'],
         skip_optimizer=training_args['skip_optimizer'],
         scheduler=training_args['scheduler'],
@@ -102,6 +104,17 @@ def get_model(model_args, training_args, checkpoint_path=None, additional_config
     if checkpoint_path is not None:
         #lightning_model.load_state_dict(torch.load(checkpoint_path)['state_dict'], map_location=get_accelerator())
         lightning_model.load_state_dict(torch.load(checkpoint_path, map_location=torch.device('cpu'))['state_dict'])
+
+
+    # if fine_tune_path:
+    #     # Load a config file
+    #     model_path = MODELS_DIR / fine_tune_path
+    #     # check if the folder exists
+    #     assert model_path.exists(), f"Model folder {model_path} does not exist."
+    #     with open(model_path / 'config.yaml', 'r') as file:
+    #         config = yaml.safe_load(file)
+    #         model_to_load = config['training_args']['model_to_load']
+
 
     return lightning_model
 

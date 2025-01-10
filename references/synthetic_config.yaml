@@ -21,7 +21,7 @@ anomalies:
       magnitude:
         sign: + # +, - or +-
         range:
-          min: 0.03
+          min: 0.02
           max: 0.05
 
   # -----------------
@@ -66,8 +66,8 @@ anomalies:
       magnitude:
         sign: +
         range: 
-          min: 0.08
-          max: 0.10
+          min: 0.04
+          max: 0.08
 
   # -----------------
   drift:

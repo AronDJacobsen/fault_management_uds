@@ -1,5 +1,6 @@
 
 import argparse
+import yaml
 import os
 import shutil
 import json
@@ -38,10 +39,49 @@ import builtins
 builtins.tqdm = lambda *args, **kwargs: tqdm(*args, **{**tqdm_kwargs, **kwargs})
 
 
+def handle_anomalous_iteration(config, fine_tune_path, dataset, data_type):
+    # load the required dataset indices from the previous model
+
+    anomalous_iteration = config['dataset_args']['anomalous_iteration']
+    # load the required dataset indices
+    relative_path = '1_split/anomalous'
+    model_path = MODELS_DIR / fine_tune_path
+    save_path = model_path / relative_path / data_type
+    # assert that the folder exists
+    assert save_path.exists(), f"Anomalous folder {save_path} does not exist."
+    # load the anomaly_prediction_results.pkl and relevant indices for the datasets
+    selected_valid_indices = {}
+    with open(save_path / 'anomaly_prediction_results.pkl', 'rb') as f:
+        anomaly_prediction_results = pickle.load(f)
+    # extract relevant indices for selected anomalous iteration
+    selected_valid_indices = anomaly_prediction_results[str(anomalous_iteration)]
+    # update the valid indices for the datasets
+    dataset.update_valid_indices(selected_valid_indices)
+    return dataset
+
+
+
+def load_model_to_fine_tune(fine_tune_path, additional_configurations):
+    split = 0
+    fine_tune_path = MODELS_DIR / fine_tune_path
+    print(f"Loding fine-tuned model from {fine_tune_path}")
+    assert fine_tune_path.exists(), f"Model folder {fine_tune_path} does not exist."
+    # get configs
+    config = yaml.load(open(fine_tune_path / 'config.yaml', 'r'), Loader=yaml.Loader)
+    split_info = torch.load(fine_tune_path / 'split_info.pkl')#, map_location='cpu')
+    run_info = split_info[split]   
+    # load the model
+    model_to_load = config['training_args']['model_to_load']
+    model = load_model_checkpoint(fine_tune_path / f"{split+1}_split", run_info, model_to_load, config, additional_configurations)
+    # since fine-tuning, set the model to train mode
+    model.train()
+    return model
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Fault Management UDS')
     parser.add_argument('--config', type=str, default='default.yaml', help='config file')
+    parser.add_argument('--fine_tune_path', type=str, default=None, help='Fine-tune path')
     parser.add_argument('--fast_run', type=bool, default=False, help='Quick run')
     parser.add_argument('--save_folder', type=str, default=None, help='Save folder')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for data loading')
@@ -55,7 +95,8 @@ def main():
     args = parse_args()
 
     # Load configuration
-    config = Config(args.config, fast_run=args.fast_run, save_folder=args.save_folder, num_workers=args.num_workers)
+    config = Config(config_path=args.config, save_folder=args.save_folder, fine_tune_path=args.fine_tune_path, fast_run=args.fast_run, num_workers=args.num_workers)
+    
     seed_everything(config.config['training_args']['seed'])
 
     # # Clean up folders
@@ -95,7 +136,6 @@ def main():
         # Save the configuration as yaml
         config.save_config(config.config['save_folder'])
 
-
         ### Iterate over the different splits
         split_info = []
         for i, (train_index, val_index, test_index) in enumerate(tqdm(splits, desc='Cross-validation', total=len(splits))):
@@ -110,17 +150,25 @@ def main():
 
             ### Prepare data
             train_dataset, val_dataset, test_dataset, dataset_config = get_datasets(data, train_index, val_index, test_index, config.config['dataset_args'])
-            # create loader
-            sampler = WeightedRandomSampler(train_dataset.priority_weight, len(train_dataset), replacement=True)
+            # handle anomalous iteration if specified
+            if config.config['dataset_args']['anomalous_iteration'] != None:
+                train_dataset = handle_anomalous_iteration(config.config, args.fine_tune_path, train_dataset, 'train')
+                val_dataset = handle_anomalous_iteration(config.config, args.fine_tune_path, val_dataset, 'val')
+                test_dataset = handle_anomalous_iteration(config.config, args.fine_tune_path, test_dataset, 'test')
+            # Create loader
+            sampler = WeightedRandomSampler(train_dataset.valid_priority_weight, len(train_dataset), replacement=True)
             train_loader = DataLoader(train_dataset, batch_size=config.config['training_args']['batch_size'], sampler=sampler, num_workers=config.num_workers)
             val_loader = DataLoader(val_dataset, batch_size=config.config['training_args']['batch_size'], shuffle=False, num_workers=config.num_workers)
 
 
             ### Train model
             additional_configurations = get_additional_configurations(train_dataset)
-            model = get_model(config.config['model_args'], config.config['training_args'], additional_configurations=additional_configurations)
-            # configure the model based on the dataset
-            #model.additional_configurations(train_dataset)
+            
+            # load fine-tuned model if specified
+            if args.fine_tune_path is None:
+                model = get_model(config.config['model_args'], config.config['training_args'], additional_configurations=additional_configurations)
+            else:
+                model = load_model_to_fine_tune(args.fine_tune_path, additional_configurations)
 
             # Define callbacks
             checkpoint_callback = ModelCheckpoint(
@@ -142,9 +190,9 @@ def main():
                 'save_folder': str(current_save_folder),
                 'best_model_path': os.path.relpath(callbacks[0].best_model_path, current_save_folder),
                 'last_model_path': os.path.relpath(callbacks[0].last_model_path, current_save_folder),
-                'top_k_best_model_paths': {
-                    k: os.path.relpath(str(v), current_save_folder) for k, v in callbacks[0].best_k_models.items()
-                },
+                # 'top_k_best_model_paths': {
+                #     k: os.path.relpath(str(v), current_save_folder) for k, v in callbacks[0].best_k_models.items()
+                # },
                 'dataset_config': dataset_config,
                 'training_time': (time.time() - start_time) / 60,  # in minutes,
             }
@@ -162,6 +210,10 @@ def main():
             # evaluate the model
             eval_folder = current_save_folder / 'evaluation'
             eval_folder.mkdir(exist_ok=True)
+            # train set
+            train_dataset.valid_indices = identify_valid_indices(train_dataset.not_nan_mask, train_dataset.sequence_length, config.config['predict_steps_ahead'])
+            train_dataset.valid_timestamps = pd.to_datetime(train_dataset.timestamps[train_dataset.valid_indices.cpu().numpy()])
+            evaluate_model_on_dataset(eval_folder / 'train', model, train_dataset, dataset_config['scalers'], config, data_type='train')
             # validation set, update the valid indices and timestamps wrt forecast horizon
             val_dataset.valid_indices = identify_valid_indices(val_dataset.not_nan_mask, val_dataset.sequence_length, config.config['predict_steps_ahead'])
             val_dataset.valid_timestamps = pd.to_datetime(val_dataset.timestamps[val_dataset.valid_indices.cpu().numpy()])

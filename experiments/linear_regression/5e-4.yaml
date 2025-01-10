@@ -7,6 +7,6 @@ hparam_key_paths:
 
 
 training_args:
-  lr: 0.0001 # range
+  lr: 0.0005 # range
 
 

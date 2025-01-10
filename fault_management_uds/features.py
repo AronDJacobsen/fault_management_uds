@@ -26,6 +26,7 @@ from fault_management_uds.data.dataset import load_data, get_sensor_dataset
 from fault_management_uds.data.hdf_tools import load_dataframe_from_HDF5
 from fault_management_uds.modelling.predict import inverse_transform
 
+from fault_management_uds.train import handle_anomalous_iteration
 
 from fault_management_uds.config import PROJ_ROOT
 from fault_management_uds.config import DATA_DIR, RAW_DATA_DIR, INTERIM_DATA_DIR, PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR
@@ -43,7 +44,8 @@ builtins.tqdm = lambda *args, **kwargs: tqdm(*args, **{**tqdm_kwargs, **kwargs})
 def parse_args():
     parser = argparse.ArgumentParser(description='Fault Management UDS')
     parser.add_argument('--model_save_path', type=str, default='transformer/7_anomalous/1_iteration', help='Folder where the model is saved')
-    parser.add_argument('--data_types', type=list, default=['test'], help='Select data types to run')
+    #parser.add_argument('--data_types', type=list, default=['test'], help='Select data types to run')
+    parser.add_argument("--data_types", nargs='+', required=True, help="Data types (e.g., train, val, test).")
     parser.add_argument('--data_group', type=str, default='anomalous', help='Data group to evaluate on', choices=['clean', 'anomalous'])
     parser.add_argument('--fast_run', type=bool, default=False, help='Quick run')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for data loading')
@@ -89,7 +91,7 @@ def load_run_info(experiment_folder, data_type, subset=None):
 
 
 
-def get_outputs(model, dataset, scalers, config):
+def features(model, dataset, scalers, config, num_workers=0):
 
 
     ### Prepare the results DataFrame
@@ -119,13 +121,13 @@ def get_outputs(model, dataset, scalers, config):
     IG_seq_dims = 20
     IG_var_idxs = model.model.endogenous_idx # [slice(None), model.model.endogenous_idx]
     IG_var_dims = config['model_args']['input_size'] if IG_var_idxs == slice(None) else len(IG_var_idxs)
-    # PIG only benefits from the 1st sequence dimension
-    PIG_seq_dims = 2
-    PIG_var_idxs = [model.model.endogenous_idx] # [slice(None), [model.model.endogenous_idx]]
-    PIG_var_dims = config['model_args']['input_size'] if PIG_var_idxs == slice(None) else len(PIG_var_idxs)
+    # # PIG only benefits from the 1st sequence dimension
+    # PIG_seq_dims = 2
+    # PIG_var_idxs = [model.model.endogenous_idx] # [slice(None), [model.model.endogenous_idx]]
+    # PIG_var_dims = config['model_args']['input_size'] if PIG_var_idxs == slice(None) else len(PIG_var_idxs)
     additional_features = {
         'IG': IG_seq_dims * IG_var_dims,
-        'PIG': PIG_seq_dims * PIG_var_dims
+        #'PIG': PIG_seq_dims * PIG_var_dims
     }
     for return_name, return_dim in additional_features.items():
         # get the increment index
@@ -151,7 +153,7 @@ def get_outputs(model, dataset, scalers, config):
         dataset,
         batch_size=config['training_args']['batch_size'], 
         shuffle=False, 
-        num_workers=0
+        num_workers=num_workers,
     )
 
     ig = IntegratedGradients(model)
@@ -184,14 +186,16 @@ def get_outputs(model, dataset, scalers, config):
             results[start:start+batch_size, column_2_idx['IG']] = attributions.cpu().numpy()
 
 
-            # Calculate the locally integrated gradients
-            actual_next_step = dataset.data[valid_idx] # construct the input (actual data)
-            input = torch.cat([x[:, 1:, :], actual_next_step.unsqueeze(1)], dim=1)
-            expected_next_step = actual_next_step.clone() # construct the baseline (expected by the model)
-            expected_next_step[:, model.model.endogenous_idx] = prediction
-            baseline = torch.cat([x[:, 1:, :], expected_next_step.unsqueeze(1)], dim=1)
-            attributions = ig.attribute(input, baseline, target=0)[:, -PIG_seq_dims:, PIG_var_idxs].reshape(batch_size, -1)
-            results[start:start+batch_size, column_2_idx['PIG']] = attributions.cpu().numpy()
+            # # Calculate the locally integrated gradients
+            # # construct the original (actual data)
+            # actual_next_step = dataset.data[valid_idx].clone()
+            # expected_next_step = actual_next_step.clone()
+            # original = torch.cat([x[:, 1:, :], actual_next_step.unsqueeze(1)], dim=1)
+            # # construct the baseline (expected by the model)
+            # expected_next_step[:, model.model.endogenous_idx] = prediction
+            # baseline = torch.cat([x[:, 1:, :], expected_next_step.unsqueeze(1)], dim=1)
+            # attributions = ig.attribute(original, baseline, target=0)[:, -PIG_seq_dims:, PIG_var_idxs].reshape(batch_size, -1)
+            # results[start:start+batch_size, column_2_idx['PIG']] = attributions.cpu().numpy()
 
             # Update start index
             start += batch_size
@@ -241,6 +245,11 @@ def main():
         dataset = get_sensor_dataset(data, config['dataset_args'], data_indices, scalers, dataset_type=data_type, verbose=False)
         del data
 
+        # handle anomalous iteration if specified
+        if config['dataset_args']['anomalous_iteration'] != None:
+            print(f"Handling anomalous iteration for {data_type} data")
+            dataset = handle_anomalous_iteration(config, config['training_args']['fine_tune_path'], dataset, data_type)
+
 
         # load the model
         additional_configurations = get_additional_configurations(dataset)
@@ -249,7 +258,7 @@ def main():
 
 
         # get the outputs
-        outputs, column_2_idx = get_outputs(model, dataset, scalers, config)
+        outputs, column_2_idx = features(model, dataset, scalers, config, num_workers=num_workers)
 
         results_save_path = outputs_folder / data_type
         results_save_path.mkdir(parents=True, exist_ok=True)
@@ -261,6 +270,9 @@ def main():
         with open(results_save_path / f'column_2_idx.json', 'w') as f:
             json.dump(column_2_idx, f)
 
+        print(f"Finished processing {data_type} data")
+        print(f"Outputs saved at: {results_save_path}")
+        print("-"*50); print("\n")
 
 
 

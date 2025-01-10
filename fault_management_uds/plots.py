@@ -1,19 +1,27 @@
 from pathlib import Path
-
-#import typer
+import os
 from loguru import logger
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import matplotlib.dates as mdates
 from datetime import timedelta
 import seaborn as sns
+import itertools
+from matplotlib.colors import Normalize
 
-import os
-import tensorflow as tf
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.metrics import precision_score, recall_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
+
+from fault_management_uds.synthetic.synthetic_generator import find_unterrupted_sequences
+from fault_management_uds.utilities import get_accelerator
+from fault_management_uds.config import data_label_hue_map, data_label_hue_order, anomaly_hue_map, anomaly_hue_order
 
 from fault_management_uds.config import FIGURES_DIR, PROCESSED_DATA_DIR
 
@@ -207,6 +215,34 @@ def set_meaningful_xticks(ax, start, end):
 
 
 
+### PCA
+
+
+def fit_pca(outputs, all_feature_indices, feature_idx_names, data_label, max_components=20):
+    # Fit
+    # Standardize the data
+    scaler = StandardScaler()
+    df_scaled = scaler.fit_transform(outputs[:, all_feature_indices])
+    # Apply PCA
+    max_components = 20
+    n_components = min(max_components, len(all_feature_indices))
+    pca = PCA(n_components=n_components)
+    pca_result = pca.fit_transform(df_scaled)
+    # DataFrame with the PCA components
+    pca_df = pd.DataFrame(pca_result, columns=[f'PC{i+1}' for i in range(pca_result.shape[1])])
+    # add the coloring column
+    pca_df['Data label'] = data_label 
+    # Get the explained variance
+    explained_variance = pca.explained_variance_ratio_
+    # Get the loadings (components)
+    loadings = pd.DataFrame(
+        pca.components_.T,  # Transpose to match feature-column structure
+        columns=[f'PC{i+1}' for i in range(pca.components_.shape[0])],  
+        index=feature_idx_names
+    )
+
+    return pca_df, explained_variance, loadings
+
 
 def loading_plot(coeff, labels, scale=1, colors=None, visible=None, ax=plt, arrow_size=0.5):
     # Plot the loadings
@@ -232,7 +268,6 @@ def loading_plot(coeff, labels, scale=1, colors=None, visible=None, ax=plt, arro
 
 
 def pca_plot(pca_df, x, y, explained_variance, hue_col, hue_map, plot_loadings=False, loadings=None, save_folder=None):
-
 
     # Desired hue order
     hue_order = hue_map.keys()
@@ -268,18 +303,287 @@ def pca_plot(pca_df, x, y, explained_variance, hue_col, hue_map, plot_loadings=F
         plt.show()
     else:
         plt.savefig(save_folder / f'pca_{x}_{y}.png')
+        plt.close()
+
+
+
+def visualize_pca(save_folder, pca_df, explained_variance, loadings, max_components=4):
+
+    # Variance explained
+    plt.figure(figsize=(8, 3))
+    plt.plot(np.arange(1, len(explained_variance) + 1), np.cumsum(explained_variance), marker='o', color='navy')
+    plt.axhline(y=0.95, color='lightsteelblue', linestyle='--', linewidth=0.7)
+    plt.text(0.99, 0.91, '95% variance explained', color = 'lightsteelblue', fontsize=10)
+    idx_95 = np.argmax(np.cumsum(explained_variance) > 0.95)
+    plt.axvline(x=idx_95 + 1, color='lightsteelblue', linestyle='--', linewidth=0.7)
+    plt.xlabel('# Principal Components', fontsize=12)
+    plt.xticks(np.arange(1, len(explained_variance) + 1))
+    #plt.show()
+    plt.savefig(save_folder / 'pca_expl_var.png')
+    plt.close()
+
+
+
+    # Plot the PCA components
+    plot_pcs = list(pca_df.columns[list(range(max_components))])
+    plot_pcs = ['PC1', 'PC2', 'PC3', 'PC4']
+    pcs_combs = list(itertools.combinations(plot_pcs, 2))
+
+    for x, y in pcs_combs:
+        pca_plot(pca_df, x, y, explained_variance, 'Data label', data_label_hue_map,
+                plot_loadings=False, loadings=None,
+                save_folder=save_folder)
+
+
+    # Plot the loadings
+    n_components = idx_95+1 # seem to explain most of the variance
+    plt.figure(figsize=(12, 5))
+    sns.heatmap(loadings.iloc[:, :n_components].T, annot=False, cmap='coolwarm', center=0, fmt=".2f", cbar=True)
+    plt.xlabel('Hidden dimension', fontsize=14)
+    # rotate the y labels
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    #plt.show()
+    plt.savefig(save_folder / 'pca_loadings.png')
+    plt.close()
+
+
+
+# t-SNE
+def fit_tsne(outputs, all_feature_indices, feature_idx_names, data_label, predicted_anomalies):
+
+    # normalize the data
+    # scaler = StandardScaler()
+    # df_scaled = scaler.fit_transform(outputs[:, all_feature_indices])
+    # if get_accelerator() == 'cuda':
+    #     from tsnecuda import TSNE
+    #     tsne = TSNE(n_components=2, random_seed=42)
+    #     tsne_results = tsne.fit(df_scaled)
+    #     tsne_df = pd.DataFrame(tsne_results, columns=['t-SNE 1', 't-SNE 2'])
+
+    # # if CPU, apply PCA first
+    # else:
+    from sklearn.manifold import TSNE
+    pca_df, explained_variance, _ = fit_pca(outputs, all_feature_indices, feature_idx_names, data_label)
+    pca_df['Predicted'] = ['Anomalous' if x == 1 else 'Normal' for x in predicted_anomalies]
+    
+    # Subsample the data, stratified by the data label
+    # - roughly 6% pollution, so the weights are gonna be 0.1 on the normal and 0.9 on the anomalies
+    pca_df['Weights'] = np.where(pca_df['Data label'] != 'Original', 0.2, 0.5) 
+    pca_df = pca_df.sample(n=20000, weights='Weights', random_state=42)
+    
+    # Store the data label and predicted
+    data_label = pca_df['Data label'].values
+    predicted_anomalies = pca_df['Predicted'].values
+    # Remove columns
+    pca_df = pca_df.drop(columns=['Data label', 'Predicted', 'Weights'])
+    # Select n_components that explain 99% of the variance
+    n_components = np.argmax(np.cumsum(explained_variance) > 0.95) + 1
+    pca_df = pca_df.iloc[:, :n_components]     
+    # Apply t-SNE
+    tsne = TSNE(n_components=2, random_state=42)
+    tsne_results = tsne.fit_transform(pca_df)
+    tsne_df = pd.DataFrame(tsne_results, columns=['t-SNE 1', 't-SNE 2'])
+
+    tsne_df['Data label'] = data_label
+    tsne_df['Predicted'] = predicted_anomalies
+
+    return tsne_df
+
+def visualize_tsne(save_folder, tsne_df):
+    # Construct the t-SNE
+    # Visualize with the data label
+    plt.figure(figsize=(12, 7)) # it is based on 10 is the
+    sns.scatterplot(x='t-SNE 1', y='t-SNE 2',
+                    data=tsne_df.sort_values('Data label', key=np.vectorize(data_label_hue_order.index)),
+                    hue='Data label', 
+                    hue_order=list(data_label_hue_map.keys()),
+                    palette=data_label_hue_map, s=6, alpha=0.7)
+    plt.legend(loc='upper right')
+    plt.savefig(save_folder / 't-SNE_data_label.png', dpi=150)
+    plt.close()
+
+    # Visualize with the predicted
+    plt.figure(figsize=(12, 7))
+    sns.scatterplot(x='t-SNE 1', y='t-SNE 2', 
+                    data=tsne_df.sort_values('Predicted', key=np.vectorize(anomaly_hue_order.index)),
+                    hue='Predicted', 
+                    hue_order=list(anomaly_hue_map.keys()),
+                    palette=anomaly_hue_map, s=6, alpha=0.7)
+    plt.legend(loc='upper right')
+    plt.savefig(save_folder / 't-SNE_predicted.png', dpi=150)
+    plt.close()
 
 
 
 
-def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True):
+### ROC, AUC and Confusion Matrix
+
+def visualize_confusion(ax, i, key, conf_matrix, fmt, cmap):
+    sns.heatmap(conf_matrix, annot=True, fmt=fmt, cmap=cmap, cbar=False, ax=ax)
+    ax.set_title(key, fontsize=14)
+    if i == 0:
+        ax.set_ylabel('Actual', fontsize=12)
+        ax.set_xlabel('Predicted', fontsize=12)
+    # set y and x ticks
+    ax.set_xticklabels(['Normal', 'Anomaly'], fontsize=10)
+    ax.set_yticklabels(['Normal', 'Anomaly'], fontsize=10)
+    return ax
+
+
+def visualize_roc_auc(ax, i, key, fpr, tpr, roc_auc):
+    ax.plot(fpr, tpr, color='darkorange', lw=2, label='AUC: %0.2f' % roc_auc)
+    ax.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    if i == 0:
+        ax.set_ylabel('TPR', fontsize=12)
+        ax.set_xlabel('FPR', fontsize=12)
+    ax.legend(loc='lower right')
+    ax.set_title(key, fontsize=1)
+    return ax
+
+
+
+def cm_roc_auc_results(save_folder, results, evaluate_keys, data_label):
+    # Overall results
+    fig, axes = plt.subplots(3, len(evaluate_keys), figsize=(15, 7))
+    auc_scores = {}
+    for i, key in enumerate(evaluate_keys):
+        # Confusion matrix
+        conf_matrix = confusion_matrix(results['Actual'], results[key]['Predicted'])
+        axes[0, i] = visualize_confusion(axes[0, i], i, key, conf_matrix, 'd', 'Blues')
+        # Percentage confusion matrix
+        conf_matrix = confusion_matrix(results['Actual'], results[key]['Predicted'])
+        conf_matrix = conf_matrix.astype('float') / conf_matrix.sum(axis=1)[:, np.newaxis] * 100
+        axes[1, i] = visualize_confusion(axes[1, i], i, ' ', conf_matrix, ".2f", 'Blues')
+        # ROC curve
+        fpr, tpr, _ = roc_curve(results['Actual'], results[key]['Decision Function'])
+        roc_auc = auc(fpr, tpr)
+        auc_scores[key] = {'Overall': roc_auc}
+        axes[2, i] = visualize_roc_auc(axes[2, i], i, ' ', fpr, tpr, roc_auc)
+    plt.tight_layout()
+    #plt.show()
+    plt.savefig(save_folder / 'cm_roc_auc_Overall.png')
+    plt.close()
+
+
+    # For each anomaly
+    for label in data_label_hue_order[::-1]:
+        if label == 'Original':
+            continue
+        mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
+        # Create a figure with two subplots side by side
+        fig, axes = plt.subplots(2, len(evaluate_keys), figsize=(15, 5))
+        for i, key in enumerate(evaluate_keys):
+            # Confusion matrix
+            conf_matrix = confusion_matrix(results['Actual'][mask], results[key]['Predicted'][mask])
+            conf_matrix = conf_matrix.astype('float') / conf_matrix.sum(axis=1)[:, np.newaxis] * 100
+            axes[0, i] = visualize_confusion(axes[0, i], i, key, conf_matrix, ".2f", 'Blues')
+
+            # ROC curve
+            fpr, tpr, _ = roc_curve(results['Actual'][mask], results[key]['Decision Function'][mask])
+            roc_auc = auc(fpr, tpr)
+            auc_scores[key][label] = roc_auc
+            axes[1, i] = visualize_roc_auc(axes[1, i], i, ' ', fpr, tpr, roc_auc)
+
+        plt.tight_layout()
+        #plt.show()
+        plt.savefig(save_folder / f'cm_roc_auc_{label}.png')
+        plt.close()
+
+        print('\n')
+
+    return auc_scores
+
+
+
+### The matrices
+
+# def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True):
+#     norm = Normalize(vmin=data.min(), vmax=data.max())
+#     cmap = plt.get_cmap(cmap)
+    
+#     for i in range(data.shape[0]):  # Iterate over rows
+#         for j in range(data.shape[1]):  # Iterate over columns
+#             value = data[i, j]
+#             is_max = value == data[i].max() if high_best else value == data[i].min()
+#             text_kwargs = {"weight": "bold"} if is_max else {}
+            
+#             # Get the background color for the cell
+#             bg_color = cmap(norm(value))
+            
+#             # Determine text color (white or black) based on brightness
+#             brightness = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
+#             text_color = "white" if brightness < 0.80 else "black"
+            
+#             # Add text annotation
+#             str_value = data_fmt[i, j]
+#             ax.text(j + 0.5, i + 0.5, str_value, ha="center", va="center", color=text_color, **text_kwargs)
+
+
+
+# def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best=True, figsize=(10, 3), save_folder=None):
+
+#     # Prepare the data
+#     data_fmt = data.to_numpy().round(round_to).astype(str)
+#     if suffix is not None:
+#         # add a % sign to each value
+#         data_fmt = np.char.add(data_fmt, suffix)
+
+#     # Create the heatmap
+#     plt.figure(figsize=figsize)
+#     ax = sns.heatmap(data, annot=False, cmap=cmap, cbar=False)
+#     annotate_heatmap(data.to_numpy(), data_fmt, ax=ax, cmap=cmap, high_best=high_best)
+#     # format
+#     ax.yaxis.get_major_ticks()[-1].label1.set_fontweight('bold')
+#     ax.yaxis.get_major_ticks()[-2].label1.set_fontweight('bold')
+#     plt.gca().invert_yaxis()
+#     plt.gca().xaxis.set_ticks_position('top')
+#     plt.xticks(fontsize=12)
+#     plt.gca().xaxis.set_tick_params(size=0)
+#     plt.tight_layout()
+#     if save_folder == None:
+#         plt.show()
+#     else:
+#         plt.savefig(save_folder / f'metric_{metric}.png')
+#         plt.close()
+
+
+# def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True, annotate_row_wise=True):
+#     norm = Normalize(vmin=data.min(), vmax=data.max())
+#     cmap = plt.get_cmap(cmap)
+    
+#     for i in range(data.shape[0]):  # Iterate over rows
+#         for j in range(data.shape[1]):  # Iterate over columns
+#             value = data[i, j]
+#             is_max = value == data[i].max() if high_best else value == data[i].min()
+#             text_kwargs = {"weight": "bold"} if is_max else {}
+            
+#             # Get the background color for the cell
+#             bg_color = cmap(norm(value))
+            
+#             # Determine text color (white or black) based on brightness
+#             brightness = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
+#             text_color = "white" if brightness < 0.80 else "black"
+            
+#             # Add text annotation
+#             str_value = data_fmt[i, j]
+#             ax.text(j + 0.5, i + 0.5, str_value, ha="center", va="center", color=text_color, **text_kwargs)
+
+def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True, annotate_row_wise=True):
+
     norm = Normalize(vmin=data.min(), vmax=data.max())
     cmap = plt.get_cmap(cmap)
     
     for i in range(data.shape[0]):  # Iterate over rows
         for j in range(data.shape[1]):  # Iterate over columns
             value = data[i, j]
-            is_max = value == data[i].max() if high_best else value == data[i].min()
+            if annotate_row_wise:
+                is_max = value == data[i].max() if high_best else value == data[i].min()
+            else:  # Annotate column-wise
+                is_max = value == data[:, j].max() if high_best else value == data[:, j].min()
+
             text_kwargs = {"weight": "bold"} if is_max else {}
             
             # Get the background color for the cell
@@ -294,8 +598,7 @@ def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True):
             ax.text(j + 0.5, i + 0.5, str_value, ha="center", va="center", color=text_color, **text_kwargs)
 
 
-
-def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best=True, figsize=(10, 3), save_folder=None):
+def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best=True, figsize=(10, 3), save_folder=None, top_n_bold=2, annotate_row_wise=True):
 
     # Prepare the data
     data_fmt = data.to_numpy().round(round_to).astype(str)
@@ -306,10 +609,11 @@ def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best
     # Create the heatmap
     plt.figure(figsize=figsize)
     ax = sns.heatmap(data, annot=False, cmap=cmap, cbar=False)
-    annotate_heatmap(data.to_numpy(), data_fmt, ax=ax, cmap=cmap, high_best=high_best)
+    annotate_heatmap(data.to_numpy(), data_fmt, ax=ax, cmap=cmap, high_best=high_best, annotate_row_wise=annotate_row_wise)
     # format
-    ax.yaxis.get_major_ticks()[-1].label1.set_fontweight('bold')
-    ax.yaxis.get_major_ticks()[-2].label1.set_fontweight('bold')
+    for i in range(top_n_bold):
+        ax.yaxis.get_major_ticks()[-(i+1)].label1.set_fontweight('bold')
+    #ax.yaxis.get_major_ticks()[-2].label1.set_fontweight('bold')
     plt.gca().invert_yaxis()
     plt.gca().xaxis.set_ticks_position('top')
     plt.xticks(fontsize=12)
@@ -319,30 +623,136 @@ def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best
         plt.show()
     else:
         plt.savefig(save_folder / f'metric_{metric}.png')
+        plt.close()
 
 
 
-def visualize_confusion(ax, i, conf_matrix, fmt, cmap):
-    sns.heatmap(conf_matrix, annot=True, fmt=fmt, cmap=cmap, cbar=False, ax=ax)
-    ax.set_title(key, fontsize=14)
-    if i == 0:
-        ax.set_ylabel('Actual', fontsize=12)
-        ax.set_xlabel('Predicted', fontsize=12)
-    # set y and x ticks
-    ax.set_xticklabels(['Normal', 'Anomaly'], fontsize=10)
-    ax.set_yticklabels(['Normal', 'Anomaly'], fontsize=10)
-    return ax
+
+def get_coverage(predicted, anomaly_start_end):
+    # Given start and end of anomalies, find how much of the anomaly is covered by the prediction
+    # Find all indices where the value is 1
+    ones_indices = np.where(predicted == 1)[0]
+    # Find the closest index in both directions
+    if len(ones_indices) == 0:
+        # do not continue
+        raise ValueError("No anomalies detected")
+
+    coverage = []
+
+    for start, end in anomaly_start_end:
+        # extract relevant data
+        anomaly_data = predicted[start:end+1]
+        
+        # Coverage
+        coverage.append(anomaly_data.sum() / len(anomaly_data))
+
+    return coverage
+
+def get_timing(predicted, anomaly_start_end):
+    # Given start and end of anomalies, find how close the prediction is to the start
+    # Find all indices where the value is 1
+    ones_indices = np.where(predicted == 1)[0]
+    # Find the closest index in both directions
+    if len(ones_indices) == 0:
+        # do not continue
+        raise ValueError("No anomalies detected")
+
+    timing = []
+
+    for i, (start, end) in enumerate(anomaly_start_end):
+        # Filter indices that are after the start
+        valid_indices = ones_indices[ones_indices > start]
+
+        if valid_indices.size > 0:  # Check if there are valid indices
+            distances = np.abs(valid_indices - start)
+            closest_index = valid_indices[np.argmin(distances)]
+            timing.append(closest_index - start)
+        else:
+            # stop the loop
+            print(f"Stopping with {len(anomaly_start_end) - i} anomalies left")
+            break
+    return timing
 
 
-def visualize_roc_auc(ax, i, fpr, tpr, roc_auc):
-    ax.plot(fpr, tpr, color='darkorange', lw=2, label='AUC: %0.2f' % roc_auc)
-    ax.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    ax.set_xlim([0.0, 1.0])
-    ax.set_ylim([0.0, 1.05])
-    if i == 0:
-        ax.set_ylabel('TPR', fontsize=12)
-        ax.set_xlabel('FPR', fontsize=12)
-    ax.legend(loc='lower right')
-    ax.set_title(' ', fontsize=1)
-    return ax
+def metric_results(save_folder, auc_scores, results, evaluate_keys, data_label):
+    # row ordering
+    row_order = data_label_hue_order[1:] + ['Average', 'Overall']
+
+    # AUC
+    auc_df = pd.DataFrame(auc_scores)
+    # Calculate the average AUC as well
+    auc_df.loc['Average'] = auc_df.loc[data_label_hue_order[1:]].mean()
+    auc_df = auc_df.loc[row_order]
+    visualize_metric_matrix('AUC', auc_df, 'Oranges', 2, suffix=None, figsize=(10, 3), save_folder=save_folder)
+
+    # Precision
+    precision_scores = {}
+    for key in evaluate_keys:
+        precision_scores[key] = {'Overall': precision_score(results['Actual'], results[key]['Predicted'])*100}
+        for label in data_label_hue_order:
+            if label == 'Original':
+                continue
+            mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
+            precision_scores[key][label] = precision_score(
+                results['Actual'][mask], results[key]['Predicted'][mask]
+            ) * 100
+    precision_df = pd.DataFrame(precision_scores)
+    precision_df.loc['Average'] = precision_df.loc[data_label_hue_order[1:]].mean()
+    precision_df = precision_df.loc[row_order]
+    visualize_metric_matrix('Precision', precision_df, 'Blues', 2, suffix='%', figsize=(10, 3), save_folder=save_folder)
+
+    # Recall
+    recall_scores = {}
+    for key in evaluate_keys:
+        recall_scores[key] = {'Overall': recall_score(results['Actual'], results[key]['Predicted'])*100}
+        for label in data_label_hue_order:
+            if label == 'Original':
+                continue
+            mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
+            recall_scores[key][label] = recall_score(
+                results['Actual'][mask], results[key]['Predicted'][mask]
+            ) * 100
+    recall_df = pd.DataFrame(recall_scores)
+    recall_df.loc['Average'] = recall_df.loc[data_label_hue_order[1:]].mean()
+    recall_df = recall_df.loc[row_order]
+    visualize_metric_matrix('Recall', recall_df, 'Reds', 2, suffix='%', figsize=(10, 3), save_folder=save_folder)
+
+    # The other metrics
+    # Get the start and end of each anomaly
+    indices_of_ones = [index for index, value in enumerate(results['Actual']) if value == 1]
+    _, anomaly_start_end = find_unterrupted_sequences(indices_of_ones, 0)
+
+    # Coverage
+    coverage_scores = {}
+    for key in evaluate_keys:
+        coverage_scores[key] = {'Overall': np.mean(get_coverage(results[key]['Predicted'], anomaly_start_end)) * 100}
+        for label in data_label_hue_order:
+            if label == 'Original':
+                continue
+            mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
+            _indices_of_ones = [index for index, value in enumerate(results['Actual'][mask]) if value == 1]
+            _, _anomaly_start_end = find_unterrupted_sequences(_indices_of_ones, 0)
+            coverage_scores[key][label] = np.mean(get_coverage(results[key]['Predicted'][mask], _anomaly_start_end)) * 100
+    coverage_df = pd.DataFrame(coverage_scores)
+    coverage_df.loc['Average'] = coverage_df.loc[data_label_hue_order[1:]].mean()
+    coverage_df = coverage_df.loc[row_order]
+    visualize_metric_matrix('Coverage', coverage_df, 'Purples', 2, suffix='%', figsize=(10, 3), save_folder=save_folder)
+
+    # Timing
+    timing_scores = {}
+    for key in evaluate_keys:
+        timing_scores[key] = {'Overall': np.mean(get_timing(results[key]['Predicted'], anomaly_start_end))}
+        for label in data_label_hue_order:
+            if label == 'Original':
+                continue
+            mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
+            _indices_of_ones = [index for index, value in enumerate(results['Actual'][mask]) if value == 1]
+            _, _anomaly_start_end = find_unterrupted_sequences(_indices_of_ones, 0)
+            timing_scores[key][label] = np.mean(get_timing(results[key]['Predicted'][mask], _anomaly_start_end))
+    timing_df = pd.DataFrame(timing_scores)
+    timing_df.loc['Average'] = timing_df.loc[data_label_hue_order[1:]].mean()
+    timing_df = timing_df.loc[row_order]
+    visualize_metric_matrix('Timing', timing_df, 'Greens_r', 0, suffix=' min.', high_best=False, figsize=(10, 3), save_folder=save_folder)
+
+
 

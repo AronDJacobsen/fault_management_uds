@@ -213,29 +213,50 @@ sensor_2_alias = {
 
 
 
+data_label_hue_map = {
+    'Spike': 'OrangeRed',
+    'Noise': 'DarkGray',
+    'Frozen': 'SteelBlue',
+    'Offset': 'Gold',
+    'Drift': 'LightSeaGreen',
+    'Original': 'blanchedalmond', 
+}
+data_label_hue_order = list(data_label_hue_map.keys())[::-1]
+
+anomaly_hue_map = {
+    'Anomalous': 'mediumpurple',
+    'Normal': data_label_hue_map['Original'],
+}
+anomaly_hue_order = list(anomaly_hue_map.keys())[::-1]
+
+
 
 class Config:
     """
     Class to store configuration parameters
     """
-    def __init__(self, config_path, fast_run=False, save_folder=None, num_workers=0):
-        # Define experiment folder; given 'transformer/2_data_features/test.yaml' we want 'transformer/2_data_features'
+    def __init__(self, config_path="", save_folder=None, fine_tune_path=None, fast_run=False, num_workers=0):
+        self.num_workers = num_workers
+        self.fine_tune_path = fine_tune_path
+
+        # Define experiment folder; e.g. given 'transformer/2_data_features/test.yaml' we want 'transformer/2_data_features'
         self.relative_path = '/'.join(config_path.split('/')[:-1])
-        if save_folder is not None:
+
+        # if provided with a save folder, use it
+        if save_folder is not None: 
             self.experiment_folder = save_folder / self.relative_path # config_path.split('/')[0].split('.')[0]
+        # else default to MODELS_DIR
         else:
             self.experiment_folder = MODELS_DIR / self.relative_path # config_path.split('/')[0].split('.')[0]
-        os.makedirs(self.experiment_folder, exist_ok=True)
-        self.num_workers = num_workers
         
+        os.makedirs(self.experiment_folder, exist_ok=True)
+
         # Load configuration
         self.config_folder = PROJ_ROOT / 'experiments'
         self.config_path = self.config_folder / config_path
         self.config = self.load_config()
-
         # Define additional parameters
         self.define_additional_parameters()
-
         # Define the hyperparameter search grid
         self.hparam_grid = self.get_hparam_grid()
 
@@ -247,6 +268,7 @@ class Config:
             self.config['training_args']['log_every_n_steps'] = 1
             self.config['training_args']['val_check_interval'] = 5
 
+
     def define_additional_parameters(self):
         self.config['dataset_args']['sequence_length'] = self.config['model_args']['sequence_length']
         self.config['dataset_args']['data_file_path'] = PROCESSED_DATA_DIR / 'Bellinge.h5'
@@ -254,6 +276,7 @@ class Config:
         self.config['dataset_args']['data_variables'] = self.config['dataset_args']['exogenous_vars'] + self.config['dataset_args']['endogenous_vars']
         self.config['model_args']['input_size'] = len(self.config['dataset_args']['variable_list']) - len(self.config['dataset_args']['hold_out_vars'])
         self.config['model_args']['output_size'] = len(self.config['dataset_args']['endogenous_vars'])
+        self.config['training_args']['fine_tune_path'] = self.fine_tune_path
 
 
     def load_config(self, ):
@@ -365,6 +388,3 @@ def get_additional_configurations(dataset):
     additional_configurations['n_obs'] = len(dataset)
     return additional_configurations
   
-
-
-

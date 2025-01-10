@@ -143,8 +143,9 @@ class SensorDataset(Dataset):
         print(f"Validity: {invalid} minutes are invalid.") if self.verbose else None
 
         # filter priority weight based on valid indices
+        self.priority_weight = priority_weight  
         if priority_weight is not None:
-            self.priority_weight = priority_weight[self.valid_indices.cpu().numpy()]
+            self.valid_priority_weight = priority_weight[self.valid_indices.cpu().numpy()]
 
         # store the columns, and timestamps
         self.columns = np.array(columns)
@@ -214,6 +215,16 @@ class SensorDataset(Dataset):
         return x, y, mask, idx
 
 
+    def update_valid_indices(self, valid_indices):
+        # convert to tensor if not already
+        valid_indices = torch.tensor(valid_indices.astype(int), dtype=torch.long).to(self.device)
+        # update the valid indices
+        self.valid_indices = valid_indices
+        # as well as priority weight and timestamps
+        if self.priority_weight is not None:
+            self.valid_priority_weight = self.priority_weight[self.valid_indices.cpu().numpy()]
+        self.valid_timestamps = pd.to_datetime(self.timestamps[self.valid_indices.cpu().numpy()])
+
 
 
 def identify_valid_indices(valid_mask, window_back, window_ahead):
@@ -235,7 +246,10 @@ def identify_valid_indices(valid_mask, window_back, window_ahead):
     device = get_accelerator(verbose=False)
 
     # Ensure valid mask is a tensor
-    valid_mask = torch.tensor(valid_mask, dtype=torch.bool).to(device)
+    if not torch.is_tensor(valid_mask):
+        valid_mask = torch.tensor(valid_mask, dtype=torch.bool).to(device)
+    valid_mask = valid_mask.clone().detach().to(torch.bool).to(device)
+
 
     # Ensure input is boolean and handle multi-dimensional data
     if valid_mask.ndim > 1:

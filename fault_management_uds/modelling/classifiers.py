@@ -1,7 +1,12 @@
 
 import pandas as pd
 from tqdm import tqdm
+import numpy as np
 
+
+from sklearn.ensemble import IsolationForest
+from sklearn.svm import OneClassSVM
+from sklearn.neighbors import LocalOutlierFactor
 
 
 
@@ -74,39 +79,43 @@ def classify_rain_events(rain_data, min_event_duration=30, min_event_rainfall=10
 
 
 # Function to select and apply the anomaly detection model
-def detect_anomalies(model_name, data, contamination='auto', n_neighbors=20, random_state=42):
+def detect_anomalies(model_name, model, data, contamination='auto', n_neighbors=20, random_state=42):
     if model_name == 'IsolationForest':
-        model = IsolationForest(
-            contamination=contamination, 
-            random_state=random_state
-        )
-        model.fit(data)
+        if model is None:
+            model = IsolationForest(
+                contamination=contamination, 
+                random_state=random_state
+            )
+            model.fit(data)
         predictions = model.predict(data)
         decision_function = model.decision_function(data)
         predictions = np.array([1 if x == -1 else 0 for x in predictions])
-        return predictions, -decision_function
+        return predictions, -decision_function, model
 
     elif model_name == 'OneClassSVM':
-        model = OneClassSVM(
-            #nu=contamination,  # Proportion of outliers
-            kernel="rbf",  # Radial basis function kernel
-            gamma="scale",  # Kernel coefficient
-        )
-        model.fit(data)
+        if model is None:
+            model = OneClassSVM(
+                #nu=contamination,  # Proportion of outliers
+                kernel="rbf",  # Radial basis function kernel
+                gamma="scale",  # Kernel coefficient
+            )
+            model.fit(data)
         predictions = model.predict(data)
         predictions = np.array([1 if x == -1 else 0 for x in predictions])
-        return predictions, None  # One-Class SVM doesn't have a decision function like Isolation Forest
+        return predictions, None, model
 
     elif model_name == 'LOF':
-        model = LocalOutlierFactor(
-            n_neighbors=n_neighbors,
-            contamination=contamination, 
-            novelty=False
-        )
-        lof_scores = model.fit_predict(data)
+        if model is None:
+            model = LocalOutlierFactor(
+                n_neighbors=n_neighbors,
+                contamination=contamination, 
+                novelty=False
+            )
+            model.fit(data)
+        lof_scores = model._decision_function(data)
         predictions = np.array([1 if x == -1 else 0 for x in lof_scores])
         negative_outlier_factor = -model.negative_outlier_factor_
-        return predictions, negative_outlier_factor
+        return predictions, negative_outlier_factor, model
 
     else:
         raise ValueError(f"Model {model_name} is not recognized. Choose 'IsolationForest', 'OneClassSVM', or 'LOF'.")

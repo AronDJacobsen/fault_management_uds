@@ -1,8 +1,8 @@
 
 
 hparam_key_paths:
-  - 'name'
-name: '0_iteration'
+  - 'iteration'
+iteration: '0'
 
 
 

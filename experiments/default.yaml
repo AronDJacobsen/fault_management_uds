@@ -37,6 +37,9 @@ dataset_args:
   steps_ahead: 1
   data_group: 'clean'
 
+  anomalous_iteration: 
+
+
 training_args:
   lr: 0.0005
   max_epochs: 100
@@ -58,6 +61,7 @@ training_args:
 
   model_to_load: 'best_model_path' # ['best_model_path', 'last_model_path']
 
+  
 model_args:
   model_name: 'LSTM'
   sequence_length: 120

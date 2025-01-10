@@ -76,6 +76,10 @@ Freeze the environment to a file:
     ```bash
     pip freeze | grep -v "file://" > requirements.txt
     ```
+    or windows
+    ```bach
+    pip freeze | findstr /V "file://" > requirements.txt
+    ```
 
     ```bash
     pip install -r requirements.txt

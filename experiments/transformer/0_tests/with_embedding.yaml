@@ -1,0 +1,14 @@
+
+
+
+hparam_key_paths:
+  - 'model_args/use_embedding'
+
+
+model_args:
+  hidden_size: 64 # range
+  num_heads: 2 # range
+  num_layers: 4 # range
+
+
+  use_embedding: False

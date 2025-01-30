@@ -70,6 +70,7 @@ def get_model(model_args, training_args, checkpoint_path=None, additional_config
                         input_size=model_args['input_size'],
                         sequence_length=model_args['sequence_length'], 
                         hidden_size=model_args['hidden_size'], 
+                        use_embedding_layer=model_args['use_embedding_layer'],
                         output_size=model_args['output_size'],
                         num_heads=model_args['num_heads'], 
                         num_layers=model_args['num_layers'], 
@@ -385,16 +386,22 @@ class LSTMModel(nn.Module):
 
 
 class TransformerModel(nn.Module):
-    def __init__(self, input_size, sequence_length, hidden_size, output_size, 
-                 num_heads, num_layers, positional_encoding, dropout, 
-                 aggregate_hidden,
-                 predict_difference, endogenous_idx, 
-                 ):
-        
+    def __init__(self, 
+            input_size, sequence_length, 
+            hidden_size, use_embedding_layer,
+            output_size, 
+            num_heads, num_layers, positional_encoding, dropout, 
+            aggregate_hidden,
+            predict_difference, endogenous_idx, 
+        ):
         super(TransformerModel, self).__init__()
+        # https://peterbloem.nl/blog/transformers
         self.model_name = 'Transformer'
         self.input_size = input_size
-        self.hidden_size = hidden_size
+        self.sequence_length = sequence_length
+        self.use_embedding_layer = use_embedding_layer
+        self.hidden_size = hidden_size if use_embedding_layer else input_size
+
         self.output_size = output_size
         self.num_heads = num_heads
         self.num_layers = num_layers
@@ -402,18 +409,20 @@ class TransformerModel(nn.Module):
         self.aggregate_hidden = aggregate_hidden
         self.predict_difference = predict_difference
         self.endogenous_idx = endogenous_idx
-        
-        # Embedding layer for input
-        self.input_embedding = nn.Linear(input_size, hidden_size)
-        
+                
+
+        # Embedding layer (could represent the hidden size)
+        self.embedding = nn.Linear(input_size, hidden_size) if use_embedding_layer else nn.Identity() # in: (batch_size, seq_len, input_size), out: (batch_size, seq_len, hidden_size)
+
+
         # Positional encoding to add sequence order information
         self.positional_encoding = PositionalEncoding(hidden_size, dropout, sequence_length) if positional_encoding else None
         
         # Transformer encoder
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=hidden_size,
-            nhead=num_heads,
-            dim_feedforward=hidden_size * 2,  # Feedforward dimension
+            d_model=hidden_size, # similar to the token embedding size
+            nhead=num_heads, # 
+            dim_feedforward=hidden_size * 4,
             dropout=dropout,
             batch_first=True
         )
@@ -429,13 +438,15 @@ class TransformerModel(nn.Module):
 
 
     def forward(self, x):
-        # Embed the input and add positional encoding
-        x = self.input_embedding(x)
 
+        # Embed the input if an embedding layer is used
+        x = self.embedding(x)
+
+        # Embed the input and add positional encoding
         x = self.positional_encoding(x) if self.positional_encoding else x
         
         # Pass through the transformer encoder
-        x = self.transformer_encoder(x)
+        x = self.transformer_encoder(x) # out: [batch_size, seq_len, hidden_size]
         
         # Take the output of the last time step
         final_hidden = x.mean(dim=1) if self.aggregate_hidden else x[:, -1, :]

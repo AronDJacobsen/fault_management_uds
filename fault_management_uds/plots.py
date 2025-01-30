@@ -440,7 +440,7 @@ def visualize_roc_auc(ax, i, key, fpr, tpr, roc_auc):
         ax.set_ylabel('TPR', fontsize=12)
         ax.set_xlabel('FPR', fontsize=12)
     ax.legend(loc='lower right')
-    ax.set_title(key, fontsize=1)
+    ax.set_title(key, fontsize=14)
     return ax
 
 
@@ -598,7 +598,7 @@ def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True, annotate_
             ax.text(j + 0.5, i + 0.5, str_value, ha="center", va="center", color=text_color, **text_kwargs)
 
 
-def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best=True, figsize=(10, 3), save_folder=None, top_n_bold=2, annotate_row_wise=True):
+def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best=True, figsize=(10, 3), save_folder=None, top_n_bold=2, annotate_row_wise=True, ysize=14):
 
     # Prepare the data
     data_fmt = data.to_numpy().round(round_to).astype(str)
@@ -610,13 +610,14 @@ def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best
     plt.figure(figsize=figsize)
     ax = sns.heatmap(data, annot=False, cmap=cmap, cbar=False)
     annotate_heatmap(data.to_numpy(), data_fmt, ax=ax, cmap=cmap, high_best=high_best, annotate_row_wise=annotate_row_wise)
-    # format
+    # format, top_n_bold is the number of top rows to be bold (y labels)
     for i in range(top_n_bold):
         ax.yaxis.get_major_ticks()[-(i+1)].label1.set_fontweight('bold')
     #ax.yaxis.get_major_ticks()[-2].label1.set_fontweight('bold')
     plt.gca().invert_yaxis()
     plt.gca().xaxis.set_ticks_position('top')
     plt.xticks(fontsize=12)
+    plt.yticks(fontsize=ysize)
     plt.gca().xaxis.set_tick_params(size=0)
     plt.tight_layout()
     if save_folder == None:

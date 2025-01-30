@@ -170,16 +170,20 @@ def get_anomaly_detection_results(models, outputs, column_2_idx, feature_columns
 
 def save_results(save_folder, results, final_feature_selection):
     final_results = {
+        # useful for splitting data
         '1': results['Valid index'][results[final_feature_selection]['Predicted'] == 1],
         '0': results['Valid index'][results[final_feature_selection]['Predicted'] == 0],
         'true_1': results['Valid index'][results['Actual'] == 1],
         'true_0': results['Valid index'][results['Actual'] == 0],
+
+        'starttimes': results['Starttime'],
+        'valid_index': results['Valid index'], 
+
         # decision function
         'decision_function': results[final_feature_selection]['Decision Function'],
-        'starttimes': results['Starttime'],
-        'data_label': results['Data label'],
-        'valid_index': results['Valid index'],
-
+        'predicted': results[final_feature_selection]['Predicted'],
+        'data_label': results['Data label'], # actual data label
+        'actual': results['Actual'], # actual anomaly
     }
     # Save the results
     with open(save_folder / 'anomaly_prediction_results.pkl', 'wb') as f:

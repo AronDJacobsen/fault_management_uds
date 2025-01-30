@@ -39,6 +39,21 @@ import builtins
 builtins.tqdm = lambda *args, **kwargs: tqdm(*args, **{**tqdm_kwargs, **kwargs})
 
 
+def count_parameters(model):
+    """
+    Counts the total number of trainable parameters in a PyTorch model.
+
+    Args:
+        model (torch.nn.Module): The PyTorch model.
+
+    Returns:
+        int: The total number of trainable parameters.
+    """
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+
+
 def handle_anomalous_iteration(config, fine_tune_path, dataset, data_type):
     # load the required dataset indices from the previous model
 
@@ -195,6 +210,7 @@ def main():
                 # },
                 'dataset_config': dataset_config,
                 'training_time': (time.time() - start_time) / 60,  # in minutes,
+                'n_parameters': count_parameters(model),
             }
             split_info.append(run_info)
 

@@ -47,6 +47,10 @@ model_args:
   positional_encoding: false # [true, false]
   aggregate_hidden: false # [true, false]
 
+  use_embedding_layer: false # [true, false]
+
+
+
 training_args:
   lr: 0.0005 # range
   max_epochs: 18 # range

@@ -369,8 +369,9 @@ def fit_tsne(outputs, all_feature_indices, feature_idx_names, data_label, predic
     
     # Subsample the data, stratified by the data label
     # - roughly 6% pollution, so the weights are gonna be 0.1 on the normal and 0.9 on the anomalies
-    pca_df['Weights'] = np.where(pca_df['Data label'] != 'Original', 0.2, 0.5) 
-    pca_df = pca_df.sample(n=20000, weights='Weights', random_state=42)
+    pca_df['Weights'] = np.where(pca_df['Data label'] != 'Original', 0.8, 0.2) # 0.2 for normal, 0.5 for anomalies
+    sample_size = min(20000, len(pca_df))
+    pca_df = pca_df.sample(n=sample_size, weights='Weights', random_state=42)
     
     # Store the data label and predicted
     data_label = pca_df['Data label'].values
@@ -455,7 +456,7 @@ def cm_roc_auc_results(save_folder, results, evaluate_keys, data_label):
         axes[0, i] = visualize_confusion(axes[0, i], i, key, conf_matrix, 'd', 'Blues')
         # Percentage confusion matrix
         conf_matrix = confusion_matrix(results['Actual'], results[key]['Predicted'])
-        conf_matrix = conf_matrix.astype('float') / conf_matrix.sum(axis=1)[:, np.newaxis] * 100
+        conf_matrix = conf_matrix.astype('float') / (conf_matrix.sum(axis=1)[:, np.newaxis] + 1e-9) * 100
         axes[1, i] = visualize_confusion(axes[1, i], i, ' ', conf_matrix, ".2f", 'Blues')
         # ROC curve
         fpr, tpr, _ = roc_curve(results['Actual'], results[key]['Decision Function'])
@@ -478,7 +479,7 @@ def cm_roc_auc_results(save_folder, results, evaluate_keys, data_label):
         for i, key in enumerate(evaluate_keys):
             # Confusion matrix
             conf_matrix = confusion_matrix(results['Actual'][mask], results[key]['Predicted'][mask])
-            conf_matrix = conf_matrix.astype('float') / conf_matrix.sum(axis=1)[:, np.newaxis] * 100
+            conf_matrix = conf_matrix.astype('float') / (conf_matrix.sum(axis=1)[:, np.newaxis] + 1e-9) * 100
             axes[0, i] = visualize_confusion(axes[0, i], i, key, conf_matrix, ".2f", 'Blues')
 
             # ROC curve
@@ -580,9 +581,11 @@ def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True, annotate_
         for j in range(data.shape[1]):  # Iterate over columns
             value = data[i, j]
             if annotate_row_wise:
-                is_max = value == data[i].max() if high_best else value == data[i].min()
+                _high_best = high_best[i] if isinstance(high_best, list) else high_best
+                is_max = value == data[i].max() if _high_best else value == data[i].min()
             else:  # Annotate column-wise
-                is_max = value == data[:, j].max() if high_best else value == data[:, j].min()
+                _high_best = high_best[j] if isinstance(high_best, list) else high_best
+                is_max = value == data[:, j].max() if _high_best else value == data[:, j].min()
 
             text_kwargs = {"weight": "bold"} if is_max else {}
             
@@ -599,6 +602,9 @@ def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True, annotate_
 
 
 def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best=True, figsize=(10, 3), save_folder=None, top_n_bold=2, annotate_row_wise=True, ysize=14):
+
+    # round data
+    data = data.round(round_to)
 
     # Prepare the data
     data_fmt = data.to_numpy().round(round_to).astype(str)
@@ -618,12 +624,14 @@ def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best
     plt.gca().xaxis.set_ticks_position('top')
     plt.xticks(fontsize=12)
     plt.yticks(fontsize=ysize)
+    # ensure y tick are horizontal
+    plt.yticks(rotation=0)
     plt.gca().xaxis.set_tick_params(size=0)
     plt.tight_layout()
     if save_folder == None:
         plt.show()
     else:
-        plt.savefig(save_folder / f'metric_{metric}.png')
+        plt.savefig(save_folder / f'metric_{metric}.png', dpi=150)
         plt.close()
 
 
@@ -689,13 +697,13 @@ def metric_results(save_folder, auc_scores, results, evaluate_keys, data_label):
     # Precision
     precision_scores = {}
     for key in evaluate_keys:
-        precision_scores[key] = {'Overall': precision_score(results['Actual'], results[key]['Predicted'])*100}
+        precision_scores[key] = {'Overall': precision_score(results['Actual'], results[key]['Predicted'], zero_division=0)*100}
         for label in data_label_hue_order:
             if label == 'Original':
                 continue
             mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
             precision_scores[key][label] = precision_score(
-                results['Actual'][mask], results[key]['Predicted'][mask]
+                results['Actual'][mask], results[key]['Predicted'][mask], zero_division=0
             ) * 100
     precision_df = pd.DataFrame(precision_scores)
     precision_df.loc['Average'] = precision_df.loc[data_label_hue_order[1:]].mean()
@@ -705,13 +713,13 @@ def metric_results(save_folder, auc_scores, results, evaluate_keys, data_label):
     # Recall
     recall_scores = {}
     for key in evaluate_keys:
-        recall_scores[key] = {'Overall': recall_score(results['Actual'], results[key]['Predicted'])*100}
+        recall_scores[key] = {'Overall': recall_score(results['Actual'], results[key]['Predicted'], zero_division=0)*100}
         for label in data_label_hue_order:
             if label == 'Original':
                 continue
             mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
             recall_scores[key][label] = recall_score(
-                results['Actual'][mask], results[key]['Predicted'][mask]
+                results['Actual'][mask], results[key]['Predicted'][mask], zero_division=0
             ) * 100
     recall_df = pd.DataFrame(recall_scores)
     recall_df.loc['Average'] = recall_df.loc[data_label_hue_order[1:]].mean()

@@ -70,7 +70,7 @@ def get_model(model_args, training_args, checkpoint_path=None, additional_config
                         input_size=model_args['input_size'],
                         sequence_length=model_args['sequence_length'], 
                         hidden_size=model_args['hidden_size'], 
-                        use_embedding_layer=model_args['use_embedding_layer'],
+                        use_embedding_layer=model_args.get('use_embedding_layer', True),
                         output_size=model_args['output_size'],
                         num_heads=model_args['num_heads'], 
                         num_layers=model_args['num_layers'], 
@@ -412,7 +412,7 @@ class TransformerModel(nn.Module):
                 
 
         # Embedding layer (could represent the hidden size)
-        self.embedding = nn.Linear(input_size, hidden_size) if use_embedding_layer else nn.Identity() # in: (batch_size, seq_len, input_size), out: (batch_size, seq_len, hidden_size)
+        self.input_embedding = nn.Linear(input_size, hidden_size) if use_embedding_layer else nn.Identity() # in: (batch_size, seq_len, input_size), out: (batch_size, seq_len, hidden_size)
 
 
         # Positional encoding to add sequence order information
@@ -422,7 +422,7 @@ class TransformerModel(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=hidden_size, # similar to the token embedding size
             nhead=num_heads, # 
-            dim_feedforward=hidden_size * 4,
+            dim_feedforward=hidden_size * 2,
             dropout=dropout,
             batch_first=True
         )
@@ -440,7 +440,7 @@ class TransformerModel(nn.Module):
     def forward(self, x):
 
         # Embed the input if an embedding layer is used
-        x = self.embedding(x)
+        x = self.input_embedding(x)
 
         # Embed the input and add positional encoding
         x = self.positional_encoding(x) if self.positional_encoding else x

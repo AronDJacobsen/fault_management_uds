@@ -76,3 +76,4 @@ model_args:
 
   positional_encoding: false
   aggregate_hidden: false
+  use_embedding_layer: true # [true, false]

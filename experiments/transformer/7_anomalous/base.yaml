@@ -53,7 +53,7 @@ model_args:
 
 training_args:
   lr: 0.0005 # range
-  max_epochs: 18 # range
+  max_epochs: 16 # range
   scheduler: true
   early_stopping_patience: 18 # set to half of max_epochs
   batch_size: 32 # range

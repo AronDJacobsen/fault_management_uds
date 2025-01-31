@@ -150,6 +150,7 @@ def get_anomaly_detection_results(models, outputs, column_2_idx, feature_columns
     model_name = 'IsolationForest' # ['IsolationForest', 'OneClassSVM', 'LOF']
 
     evaluate_keys = ['Combined'] + feature_columns
+    # Initialize models
     if models is None:
         models = {k: None for k in evaluate_keys}
     evaluate_2_idx = feature_2_idx
@@ -192,12 +193,8 @@ def save_results(save_folder, results, final_feature_selection):
     print(f"Results saved at {save_folder / 'anomaly_prediction_results.pkl'}")
 
 
-def run_anomaly_detection(models, data_type, final_feature_selection, anomalous_path, evaulation_path):
+def run_anomaly_detection(models, data_type, final_feature_selection, anomalous_path, outputs, column_2_idx):
     save_folder = anomalous_path / data_type
-    
-    # load and prepare data
-    outputs, column_2_idx = load_model_outputs(save_folder)
-    outputs, column_2_idx = add_steps_ahead(evaulation_path / data_type / 'output.pkl', outputs, column_2_idx)
     
     # get the features
     feature_columns, feature_2_idx, all_feature_indices, feature_idx_names, data_label = get_features(outputs, column_2_idx)
@@ -241,7 +238,7 @@ def main():
     data_types = os.listdir(anomalous_path)
     print(f"Data types available: {data_types}")
 
-    models = None
+    models = None # to store the models
     final_feature_selection = "Combined"
 
     # train the anomaly detection on training set, and apply it on all
@@ -249,19 +246,31 @@ def main():
         print("Train outputs available")
         # train the model and get results
         print("Training the model") if models is None else print("Using previous model")
-        models = run_anomaly_detection(models, 'train', final_feature_selection, anomalous_path, evaulation_path)
+        save_folder = anomalous_path / 'train'
+        outputs, column_2_idx = load_model_outputs(save_folder)
+        outputs, column_2_idx = add_steps_ahead(evaulation_path / 'train' / 'output.pkl', outputs, column_2_idx)
+        # get the features
+        models = run_anomaly_detection(models, 'train', final_feature_selection, anomalous_path, outputs, column_2_idx)
         print("")
 
     if 'val' in data_types:
         print("Validation outputs available")
         print("Training the model") if models is None else print("Using previous model")
-        models = run_anomaly_detection(models, 'val', final_feature_selection, anomalous_path, evaulation_path)
+        save_folder = anomalous_path / 'val'
+        outputs, column_2_idx = load_model_outputs(save_folder)
+        outputs, column_2_idx = add_steps_ahead(evaulation_path / 'val' / 'output.pkl', outputs, column_2_idx)
+        # get the features
+        models = run_anomaly_detection(models, 'val', final_feature_selection, anomalous_path, outputs, column_2_idx)
         print("")
 
     if 'test' in data_types:
         print("Test outputs available")
         print("Training the model") if models is None else print("Using previous model")
-        models = run_anomaly_detection(models, 'test', final_feature_selection, anomalous_path, evaulation_path)
+        save_folder = anomalous_path / 'test'
+        outputs, column_2_idx = load_model_outputs(save_folder)
+        outputs, column_2_idx = add_steps_ahead(evaulation_path / 'test' / 'output.pkl', outputs, column_2_idx)
+        # get the features
+        models = run_anomaly_detection(models, 'test', final_feature_selection, anomalous_path, outputs, column_2_idx)
         print("")
 
 

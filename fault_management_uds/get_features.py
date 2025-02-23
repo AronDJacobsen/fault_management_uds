@@ -26,7 +26,7 @@ from fault_management_uds.data.dataset import load_data, get_sensor_dataset
 from fault_management_uds.data.hdf_tools import load_dataframe_from_HDF5
 from fault_management_uds.modelling.predict import inverse_transform
 
-from fault_management_uds.train import handle_anomalous_iteration
+from fault_management_uds.train_model import handle_anomalous_iteration
 
 from fault_management_uds.config import PROJ_ROOT
 from fault_management_uds.config import DATA_DIR, RAW_DATA_DIR, INTERIM_DATA_DIR, PROCESSED_DATA_DIR, EXTERNAL_DATA_DIR

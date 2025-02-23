@@ -74,9 +74,9 @@ def get_model(model_args, training_args, checkpoint_path=None, additional_config
                         output_size=model_args['output_size'],
                         num_heads=model_args['num_heads'], 
                         num_layers=model_args['num_layers'], 
-                        positional_encoding=model_args['positional_encoding'],
+                        positional_encoding=model_args.get('positional_encoding', False),
                         dropout=model_args['dropout'],
-                        aggregate_hidden=model_args['aggregate_hidden'],
+                        aggregate_hidden=model_args.get('aggregate_hidden', False),
                         predict_difference=model_args['predict_difference'],
                         endogenous_idx=additional_configurations['endogenous_idx'],
                         )
@@ -94,11 +94,11 @@ def get_model(model_args, training_args, checkpoint_path=None, additional_config
         learning_rate=float(training_args['lr']), 
         seed=training_args['seed'],
         skip_optimizer=training_args['skip_optimizer'],
-        scheduler=training_args['scheduler'],
+        scheduler=training_args.get('scheduler', False),    
         epochs=training_args['max_epochs'],
         steps_per_epoch=additional_configurations['n_obs'] // training_args['batch_size'],
-        directional_errors=training_args['directional_errors'],
-        dynamic_weighting=training_args['dynamic_weighting']
+        directional_errors=training_args.get('directional_errors', False),
+        dynamic_weighting=training_args.get('dynamic_weighting', False),
         )
 
     # Load the model state from the checkpoint if a path is provided
@@ -413,7 +413,7 @@ class TransformerModel(nn.Module):
 
         # Embedding layer (could represent the hidden size)
         self.input_embedding = nn.Linear(input_size, hidden_size) if use_embedding_layer else nn.Identity() # in: (batch_size, seq_len, input_size), out: (batch_size, seq_len, hidden_size)
-
+        self.hidden_size = hidden_size if use_embedding_layer else input_size
 
         # Positional encoding to add sequence order information
         self.positional_encoding = PositionalEncoding(hidden_size, dropout, sequence_length) if positional_encoding else None

@@ -15,7 +15,7 @@ from fault_management_uds.config import MODELS_DIR, REPORTS_DIR, FIGURES_DIR, RE
 from fault_management_uds.config import rain_gauge_color, condition_to_meta
 
 
-from fault_management_uds.evaluate import load_model_outputs, add_steps_ahead, run_anomaly_detection
+from fault_management_uds.evaluate_detection import load_model_outputs, add_steps_ahead, run_anomaly_detection
 
 
 

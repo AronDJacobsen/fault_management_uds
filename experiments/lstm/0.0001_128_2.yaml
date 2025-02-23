@@ -2,12 +2,16 @@
 
 
 hparam_key_paths:
+  - 'training_args/lr'
   - 'model_args/hidden_size'
   - 'model_args/num_layers'
 
 
 
 model_args:
-  hidden_size: 64
+  hidden_size: 128
   num_layers: 2
   
+
+training_args:
+  lr: 0.0001

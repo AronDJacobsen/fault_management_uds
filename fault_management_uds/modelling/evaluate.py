@@ -14,12 +14,12 @@ from fault_management_uds.modelling.predict import get_predictions, get_dataload
 from fault_management_uds.data.dataset import load_conditions
 
 
-def evaluate_model_on_dataset(eval_folder, model, dataset, scalers, configs, data_type='test'):
+def evaluate_model_on_dataset(eval_folder, model, dataset, scalers, config, data_type='test', num_workers=0):
     eval_folder.mkdir(exist_ok=True)
     
     ### Get predictions
     #predictions, targets = get_predictions(model, dataset, scalers, configs.config, configs.config['predict_steps_ahead'])
-    predictions, targets = get_dataloader_predictions(model, dataset, scalers, configs.config, configs.config['predict_steps_ahead'], configs.num_workers)
+    predictions, targets = get_dataloader_predictions(model, dataset, scalers, config, config['predict_steps_ahead'], num_workers=num_workers)
 
     # Save
     output = {
@@ -33,14 +33,14 @@ def evaluate_model_on_dataset(eval_folder, model, dataset, scalers, configs, dat
 
     ### Evaluate
     # Get the MAEs for each step ahead
-    MAEs = evaluate_step_predictions(predictions, targets, dataset.endogenous_vars, configs.config['predict_steps_ahead'])
+    MAEs = evaluate_step_predictions(predictions, targets, dataset.endogenous_vars, config['predict_steps_ahead'])
     # save the MAEs
     MAEs.to_csv(eval_folder / f'step_MAEs.csv', index=False)
 
     # Get the conditions
     conditions = load_conditions(dataset.valid_timestamps[0], dataset.valid_timestamps[-1])
     # Evaluate the model on the conditions
-    MAEs = evaluate_condition_predictions(predictions, targets, dataset, configs.config['predict_steps_ahead'], conditions)
+    MAEs = evaluate_condition_predictions(predictions, targets, dataset, config['predict_steps_ahead'], conditions)
     # save
     MAEs.to_csv(eval_folder / 'condition_MAEs.csv')
 

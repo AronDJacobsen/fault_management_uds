@@ -434,7 +434,7 @@ def visualize_confusion(ax, i, key, conf_matrix, fmt, cmap):
 
 def visualize_roc_auc(ax, i, key, fpr, tpr, roc_auc):
     ax.plot(fpr, tpr, color='darkorange', lw=2, label='AUC: %0.2f' % roc_auc)
-    ax.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    ax.plot([0, 1], [0, 1], color='grey', lw=1, linestyle='--', label='Random')
     ax.set_xlim([0.0, 1.0])
     ax.set_ylim([0.0, 1.05])
     if i == 0:
@@ -443,6 +443,7 @@ def visualize_roc_auc(ax, i, key, fpr, tpr, roc_auc):
     ax.legend(loc='lower right')
     ax.set_title(key, fontsize=14)
     return ax
+
 
 
 

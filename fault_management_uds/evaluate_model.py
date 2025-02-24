@@ -100,7 +100,7 @@ def main():
     train_index, val_index, test_index = run_info['dataset_config']['train_index'], run_info['dataset_config']['val_index'], run_info['dataset_config']['test_index']
 
     ### Prepare data
-    train_dataset, val_dataset, test_dataset, dataset_config = get_datasets(data, train_index, val_index, test_index, config.config['dataset_args'])
+    train_dataset, val_dataset, test_dataset, dataset_config = get_datasets(data, train_index, val_index, test_index, config['dataset_args'])
 
     # Create loader
     sampler = WeightedRandomSampler(train_dataset.valid_priority_weight, len(train_dataset), replacement=True)
@@ -121,15 +121,15 @@ def main():
     # train set
     train_dataset.valid_indices = identify_valid_indices(train_dataset.not_nan_mask, train_dataset.sequence_length, config['predict_steps_ahead'])
     train_dataset.valid_timestamps = pd.to_datetime(train_dataset.timestamps[train_dataset.valid_indices.cpu().numpy()])
-    evaluate_model_on_dataset(eval_folder / 'train', model, train_dataset, dataset_config['scalers'], config, data_type='train')
+    evaluate_model_on_dataset(eval_folder / 'train', model, train_dataset, dataset_config['scalers'], config, data_type='train', step_ahead=config['predict_steps_ahead'])
     # validation set, update the valid indices and timestamps wrt forecast horizon
     val_dataset.valid_indices = identify_valid_indices(val_dataset.not_nan_mask, val_dataset.sequence_length, config['predict_steps_ahead'])
     val_dataset.valid_timestamps = pd.to_datetime(val_dataset.timestamps[val_dataset.valid_indices.cpu().numpy()])
-    evaluate_model_on_dataset(eval_folder / 'val', model, val_dataset, dataset_config['scalers'], config, data_type='val')
+    evaluate_model_on_dataset(eval_folder / 'val', model, val_dataset, dataset_config['scalers'], config, data_type='val', step_ahead=config['predict_steps_ahead'])
     # test set
     test_dataset.valid_indices = identify_valid_indices(test_dataset.not_nan_mask, test_dataset.sequence_length, config['predict_steps_ahead'])
     test_dataset.valid_timestamps = pd.to_datetime(test_dataset.timestamps[test_dataset.valid_indices.cpu().numpy()])
-    evaluate_model_on_dataset(eval_folder / 'test', model, test_dataset, dataset_config['scalers'], config, data_type='test')
+    evaluate_model_on_dataset(eval_folder / 'test', model, test_dataset, dataset_config['scalers'], config, data_type='test', step_ahead=config['predict_steps_ahead']) 
 
     print('')
 

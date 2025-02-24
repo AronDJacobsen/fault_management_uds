@@ -14,7 +14,7 @@ from fault_management_uds.modelling.predict import get_predictions, get_dataload
 from fault_management_uds.data.dataset import load_conditions
 
 
-def evaluate_model_on_dataset(eval_folder, model, dataset, scalers, config, data_type='test', num_workers=0):
+def evaluate_model_on_dataset(eval_folder, model, dataset, scalers, config, data_type='test', num_workers=0, step_ahead=None):
     eval_folder.mkdir(exist_ok=True)
     
     ### Get predictions
@@ -28,6 +28,7 @@ def evaluate_model_on_dataset(eval_folder, model, dataset, scalers, config, data
         'endogenous_vars': dataset.endogenous_vars,
         'timestamps': dataset.valid_timestamps,
     }
+    save_name = 'output.pkl' if step_ahead is None else f'output_{step_ahead}_steps_ahead.pkl'
     with open(eval_folder / f'output.pkl', 'wb') as f:
         pickle.dump(output, f)
 

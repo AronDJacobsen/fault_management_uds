@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import torch
 from captum.attr import IntegratedGradients
+from sklearn.decomposition import PCA
 
 
 from torch.utils.data import DataLoader
@@ -90,8 +91,87 @@ def load_run_info(experiment_folder, data_type, subset=None):
     return config, run_folder, data_indices, scalers, run_info
 
 
+def apply_pca(ig_results, pca=None, explain_variance=0.95):
+    # if none, then fit
+    if pca is None:
+        # Apply PCA to the IG results
+        pca = PCA(n_components=explain_variance, svd_solver='full')
+        # Fit the PCA
+        pca.fit(ig_results)
+    else:
+        print("Using the provided PCA")
+    # Transform the data
+    ig_results_pca = pca.transform(ig_results)
+    print(f"Original IG shape: {ig_results.shape}, PCA IG shape: {ig_results_pca.shape}")
+    print(f"Explained variance: {pca.explained_variance_ratio_.sum()}")
+    print(f"N components: {pca.n_components_}")
+    return ig_results_pca, pca
 
-def features(model, dataset, scalers, config, num_workers=0):
+
+def add_steps_ahead(save_path, outputs, column_2_idx, use_steps_ahead=None):
+    # Add the steps ahead residuals
+    # Load
+    #save_path = MODELS_DIR / model_save_path / "1_split/evaluation" / data_type / "output.pkl"
+    n_steps_preds = pickle.load(open(save_path, 'rb'))
+    print(n_steps_preds.keys()) 
+    # dims: (n_samples, n_features, n_steps)
+    steps_ahead = n_steps_preds['predictions'].shape[2] if use_steps_ahead is None else use_steps_ahead
+    print(steps_ahead)
+    # Extract all step predictions
+    all_step_preds = n_steps_preds['predictions']  # Shape: (n_samples, n_features, n_steps)
+    timestamps = pd.to_datetime(n_steps_preds['timestamps'])
+    # create a dataframe based on timestamps as index
+    start, end = timestamps[0], timestamps[-1] + pd.Timedelta(minutes=steps_ahead)
+    full_range = pd.date_range(start=start, end=end, freq='min')
+
+    df = pd.DataFrame(index=full_range)
+
+    for step_ahead in range(steps_ahead):
+        # add the minute to the timestamps
+        _timestamps = timestamps + pd.Timedelta(minutes=step_ahead)
+        # insert the predictions into the dataframe
+        df[f"Step {step_ahead}"] = np.nan
+        df.loc[_timestamps, f"Step {step_ahead}"] = all_step_preds[:, :, step_ahead].flatten()
+
+    # if a row has any nan value, remove it
+    df = df.dropna()
+    print(f"Difference between the outputs and the steps ahead: {outputs.shape[0] - df.shape[0]}")
+
+    # Filter and match
+    starttimes = pd.to_datetime(outputs[:, column_2_idx['starttime']].flatten())
+    mask = df.index.isin(starttimes)
+    df = df[mask]
+    steps_to_outputs_idxs = np.searchsorted(starttimes, df.index)
+    # Filter the outputs
+    outputs = outputs[steps_to_outputs_idxs]
+    # Get the residuals
+    residuals = outputs[:, column_2_idx['target']].reshape(-1,1) - df.values
+    
+    # Update outputs with residuals for all lags
+    lag_indices = [outputs.shape[1] + lag for lag in range(steps_ahead)]
+    # add the residuals to the outputs
+    outputs = np.hstack([outputs, residuals])
+    column_2_idx['residuals'] = lag_indices
+    print(f"Outputs after steps ahead: {outputs.shape}")
+
+    return outputs, column_2_idx
+
+
+
+def add_integrated_gradients(save_path, outputs, column_2_idx):
+    # Load the integrated gradients
+    ig_results = pickle.load(open(save_path, 'rb'))
+    print(f"IG results shape: {ig_results.shape}")
+    # Insert the IG features into the results
+    start_idx = np.max(np.concatenate(list(column_2_idx.values()))) + 1
+    column_2_idx['IG'] = list(range(start_idx, start_idx + ig_results.shape[1]))
+    # have to stack the results
+    results = np.hstack([outputs, ig_results])
+    return results, column_2_idx
+
+
+
+def features(model, dataset, scalers, config, pca, num_workers=0):
 
 
     ### Prepare the results DataFrame
@@ -118,22 +198,27 @@ def features(model, dataset, scalers, config, num_workers=0):
         column_2_idx[return_name] = list(range(start_idx, start_idx + return_dim))
     
     # Handle additional extracted features
-    IG_seq_dims = 20
-    IG_var_idxs = model.model.endogenous_idx # [slice(None), model.model.endogenous_idx]
-    IG_var_dims = config['model_args']['input_size'] if IG_var_idxs == slice(None) else len(IG_var_idxs)
+    # IG_seq_dims = 20
+    # IG_var_idxs = model.model.endogenous_idx # [slice(None), model.model.endogenous_idx]
+    # IG_var_dims = config['model_args']['input_size'] if IG_var_idxs == slice(None) else len(IG_var_idxs)
+    
+    # IG_seq_dims = config["dataset_args"]["sequence_length"] # use the complete sequence
+    # IG_var_idxs = slice(None) # [slice(None), model.model.endogenous_idx]
+    # IG_var_dims = config['model_args']['input_size']
+    # IG_return_dim = IG_seq_dims * IG_var_dims
+    # # Define the IG to store the results
+    # ig_results = np.empty((len(valid_indices), IG_return_dim), dtype=object)
+
+
+
     # # PIG only benefits from the 1st sequence dimension
     # PIG_seq_dims = 2
     # PIG_var_idxs = [model.model.endogenous_idx] # [slice(None), [model.model.endogenous_idx]]
     # PIG_var_dims = config['model_args']['input_size'] if PIG_var_idxs == slice(None) else len(PIG_var_idxs)
-    additional_features = {
-        'IG': IG_seq_dims * IG_var_dims,
-        #'PIG': PIG_seq_dims * PIG_var_dims
-    }
-    for return_name, return_dim in additional_features.items():
-        # get the increment index
-        start_idx = np.max(np.concatenate(list(column_2_idx.values()))) + 1
-        # add the return columns
-        column_2_idx[return_name] = list(range(start_idx, start_idx + return_dim))
+    # additional_features = {
+    #     'IG': IG_seq_dims * IG_var_dims,
+    #     #'PIG': PIG_seq_dims * PIG_var_dims
+    # }
 
 
     # Prepare a combined numpy array to store the results
@@ -156,7 +241,7 @@ def features(model, dataset, scalers, config, num_workers=0):
         num_workers=num_workers,
     )
 
-    ig = IntegratedGradients(model)
+    #ig = IntegratedGradients(model)
     
     # No gradient calculation during prediction
     with torch.no_grad():
@@ -172,7 +257,7 @@ def features(model, dataset, scalers, config, num_workers=0):
             # Store the results
             results[start:start+batch_size, column_2_idx['target']] = y.cpu().numpy()
 
-            # add the output to the results
+            # add the output to the model: e.g. prediction, hidden state
             i_out = 0
             for return_name, return_idxs in column_2_idx.items():
                 if return_name in model.model.returns:
@@ -180,10 +265,11 @@ def features(model, dataset, scalers, config, num_workers=0):
                     results[start:start+batch_size, return_idxs] = output.cpu().numpy()
                     i_out += 1
 
-            # Calculate the integrated gradients
-            x.requires_grad = True
-            attributions = ig.attribute(x, target=0)[:, -IG_seq_dims:, IG_var_idxs].reshape(batch_size, -1)
-            results[start:start+batch_size, column_2_idx['IG']] = attributions.cpu().numpy()
+            # # Integrated gradients
+            # x.requires_grad = True
+            # attributions = ig.attribute(x, target=0)[:, -IG_seq_dims:, IG_var_idxs].reshape(batch_size, -1)
+            # #results[start:start+batch_size, column_2_idx['IG']] = attributions.cpu().numpy()
+            # ig_results[start:start+batch_size] = attributions.cpu().numpy()
 
 
             # # Calculate the locally integrated gradients
@@ -201,14 +287,33 @@ def features(model, dataset, scalers, config, num_workers=0):
             start += batch_size
 
 
+    # # Reduce IG dims with PCA
+    # ig_results, pca = apply_pca(ig_results, pca=pca, explain_variance=0.95)
+
+    # # Insert the IG features into the results
+    # start_idx = np.max(np.concatenate(list(column_2_idx.values()))) + 1
+    # column_2_idx['IG'] = list(range(start_idx, start_idx + ig_results.shape[1]))
+    # # have to stack the results
+    # results = np.hstack([results, ig_results])
+
+    # TOOD: Insert the IG features into the results
+    # for return_name, return_dim in additional_features.items():
+    #     # get the increment index
+    #     start_idx = np.max(np.concatenate(list(column_2_idx.values()))) + 1
+    #     # add the return columns
+    #     column_2_idx[return_name] = list(range(start_idx, start_idx + return_dim))
+
+
+
     # Inverse transform the data
     results[:, column_2_idx['target']] = inverse_transform(results[:, column_2_idx['target']], scalers, dataset.endogenous_vars, None)
     results[:, column_2_idx['prediction']] = inverse_transform(results[:, column_2_idx['prediction']], scalers, dataset.endogenous_vars, None)
 
-    # Calculate the residuals
+    # Calculate the residual
     results[:, column_2_idx['residual']] = results[:, column_2_idx['target']] - results[:, column_2_idx['prediction']]
 
-    return results, column_2_idx
+    return results, column_2_idx, pca
+
 
 
 
@@ -223,10 +328,17 @@ def main():
     fast_run = args.fast_run
     num_workers = args.num_workers
 
+    # PCA
+    pca = None # starts with none, until 'train' data is processed, then it is used for the rest of the data
 
     # handle fast run
-    subset = 5000 if fast_run else None
+    subset = 10000 if fast_run else None
     
+    # Ensure data types are in the correct order
+    dt_order = ['train', 'val', 'test']
+    data_types = [dt for dt in dt_order if dt in data_types]
+    print(f"Selected data types: {data_types}")
+
     # iterate the selected datatypes
     for data_type in data_types:
 
@@ -246,7 +358,7 @@ def main():
         del data
 
         # handle anomalous iteration if specified
-        if config['dataset_args']['anomalous_iteration'] != None:
+        if config['dataset_args'].get('anomalous_iteration', None) is not None:
             print(f"Handling anomalous iteration for {data_type} data")
             dataset = handle_anomalous_iteration(config, config['training_args']['fine_tune_path'], dataset, data_type)
 
@@ -257,8 +369,24 @@ def main():
         model = load_model_checkpoint(run_folder, run_info, model_to_load, config, additional_configurations)
 
 
-        # get the outputs
-        outputs, column_2_idx = features(model, dataset, scalers, config, num_workers=num_workers)
+        # # Get the outputs
+        # if pca is None:
+        #     print(f"### Fitting PCA for {data_type} data ###")
+        # else:
+        #     print(f"### Using a fitted PCA for {data_type} data ###")
+        
+        outputs, column_2_idx, pca = features(model, dataset, scalers, config, pca, num_workers=num_workers)
+
+        # Add the integrated gradients
+        save_path = MODELS_DIR / model_save_path / '1_split' / 'anomalous' / data_type / 'ig_results.pkl'
+        outputs, column_2_idx = add_integrated_gradients(save_path, outputs, column_2_idx)
+
+
+        # Add the steps ahead residuals
+        save_path = MODELS_DIR / model_save_path / '1_split' / 'evaluation' / data_type / 'output.pkl'
+        use_steps_ahead = config["predict_steps_ahead"] # use steps ahead as by the model
+        outputs, column_2_idx = add_steps_ahead(save_path, outputs, column_2_idx, use_steps_ahead=use_steps_ahead)
+
 
         results_save_path = outputs_folder / data_type
         results_save_path.mkdir(parents=True, exist_ok=True)

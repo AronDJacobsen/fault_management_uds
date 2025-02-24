@@ -70,56 +70,56 @@ def load_model_outputs(outputs_path):
     return outputs, column_2_idx
 
 
-def add_steps_ahead(save_path, outputs, column_2_idx):
-    # Add the steps ahead residuals
-    # Load
-    #save_path = MODELS_DIR / model_save_path / "1_split/evaluation" / data_type / "output.pkl"
-    n_steps_preds = pickle.load(open(save_path, 'rb'))
-    print(n_steps_preds.keys()) 
-    steps_ahead = n_steps_preds['predictions'].shape[2] # dims: (n_samples, n_features, n_steps)
-    print(steps_ahead)
-    # Extract all step predictions
-    all_step_preds = n_steps_preds['predictions']  # Shape: (n_samples, n_features, n_steps)
-    timestamps = pd.to_datetime(n_steps_preds['timestamps'])
-    # create a dataframe based on timestamps as index
-    start, end = timestamps[0], timestamps[-1] + pd.Timedelta(minutes=steps_ahead)
-    full_range = pd.date_range(start=start, end=end, freq='min')
+# def add_steps_ahead(save_path, outputs, column_2_idx):
+#     # Add the steps ahead residuals
+#     # Load
+#     #save_path = MODELS_DIR / model_save_path / "1_split/evaluation" / data_type / "output.pkl"
+#     n_steps_preds = pickle.load(open(save_path, 'rb'))
+#     print(n_steps_preds.keys()) 
+#     steps_ahead = n_steps_preds['predictions'].shape[2] # dims: (n_samples, n_features, n_steps)
+#     print(steps_ahead)
+#     # Extract all step predictions
+#     all_step_preds = n_steps_preds['predictions']  # Shape: (n_samples, n_features, n_steps)
+#     timestamps = pd.to_datetime(n_steps_preds['timestamps'])
+#     # create a dataframe based on timestamps as index
+#     start, end = timestamps[0], timestamps[-1] + pd.Timedelta(minutes=steps_ahead)
+#     full_range = pd.date_range(start=start, end=end, freq='min')
 
-    df = pd.DataFrame(index=full_range)
+#     df = pd.DataFrame(index=full_range)
 
-    for step_ahead in range(steps_ahead):
-        # add the minute to the timestamps
-        _timestamps = timestamps + pd.Timedelta(minutes=step_ahead)
-        # insert the predictions into the dataframe
-        df[f"Step {step_ahead}"] = np.nan
-        df.loc[_timestamps, f"Step {step_ahead}"] = all_step_preds[:, :, step_ahead].flatten()
+#     for step_ahead in range(steps_ahead):
+#         # add the minute to the timestamps
+#         _timestamps = timestamps + pd.Timedelta(minutes=step_ahead)
+#         # insert the predictions into the dataframe
+#         df[f"Step {step_ahead}"] = np.nan
+#         df.loc[_timestamps, f"Step {step_ahead}"] = all_step_preds[:, :, step_ahead].flatten()
 
-    # if a row has any nan value, remove it
-    df = df.dropna()
-    print(f"Difference between the outputs and the steps ahead: {outputs.shape[0] - df.shape[0]}")
+#     # if a row has any nan value, remove it
+#     df = df.dropna()
+#     print(f"Difference between the outputs and the steps ahead: {outputs.shape[0] - df.shape[0]}")
 
-    # Filter and match
-    starttimes = pd.to_datetime(outputs[:, column_2_idx['Starttime']].flatten())
-    mask = df.index.isin(starttimes)
-    df = df[mask]
-    steps_to_outputs_idxs = np.searchsorted(starttimes, df.index)
-    # Filter the outputs
-    outputs = outputs[steps_to_outputs_idxs]
-    # Get the residuals
-    residuals = outputs[:, column_2_idx['Target']].reshape(-1,1) - df.values
+#     # Filter and match
+#     starttimes = pd.to_datetime(outputs[:, column_2_idx['Starttime']].flatten())
+#     mask = df.index.isin(starttimes)
+#     df = df[mask]
+#     steps_to_outputs_idxs = np.searchsorted(starttimes, df.index)
+#     # Filter the outputs
+#     outputs = outputs[steps_to_outputs_idxs]
+#     # Get the residuals
+#     residuals = outputs[:, column_2_idx['Target']].reshape(-1,1) - df.values
     
-    # Update outputs with residuals for all lags
-    lag_indices = [outputs.shape[1] + lag for lag in range(steps_ahead)]
-    # add the residuals to the outputs
-    outputs = np.hstack([outputs, residuals])
-    column_2_idx['Residuals'] = lag_indices
-    print(f"Outputs after steps ahead: {outputs.shape}")
+#     # Update outputs with residuals for all lags
+#     lag_indices = [outputs.shape[1] + lag for lag in range(steps_ahead)]
+#     # add the residuals to the outputs
+#     outputs = np.hstack([outputs, residuals])
+#     column_2_idx['Residuals'] = lag_indices
+#     print(f"Outputs after steps ahead: {outputs.shape}")
 
-    return outputs, column_2_idx
+#     return outputs, column_2_idx
 
 
 def get_features(outputs, column_2_idx):
-    feature_columns = ['Target', 'Residuals', 'Final hidden', 'IG', 'PIG',]
+    feature_columns = ['Target', 'Residuals', 'Final hidden', 'IG', 'PIG',] # don't use the 'residual'
     feature_columns = [x for x in feature_columns if x in column_2_idx]
     feature_2_idx = {k: column_2_idx[k] for k in feature_columns}
     all_feature_indices = []
@@ -183,14 +183,22 @@ def save_results(save_folder, results, final_feature_selection):
         # decision function
         'decision_function': results[final_feature_selection]['Decision Function'],
         'predicted': results[final_feature_selection]['Predicted'],
-        'data_label': results['Data label'], # actual data label
         'actual': results['Actual'], # actual anomaly
+        'data_label': results['Data label'], # actual data label
+
     }
     # Save the results
     with open(save_folder / 'anomaly_prediction_results.pkl', 'wb') as f:
         pickle.dump(final_results, f)
 
     print(f"Results saved at {save_folder / 'anomaly_prediction_results.pkl'}")
+
+    # and save the complete results
+    with open(save_folder / 'anomaly_prediction_results_full.pkl', 'wb') as f:
+        pickle.dump(results, f)
+
+    print(f"Full results saved at {save_folder / 'anomaly_prediction_results_full.pkl'}")
+
 
 
 def run_anomaly_detection(models, data_type, final_feature_selection, anomalous_path, outputs, column_2_idx):
@@ -206,13 +214,13 @@ def run_anomaly_detection(models, data_type, final_feature_selection, anomalous_
     # Anomaly detection
     results, evaluate_keys, models = get_anomaly_detection_results(models, outputs, column_2_idx, feature_columns, feature_2_idx, all_feature_indices, data_label)
 
-    # Visualize the results
-    auc_scores = cm_roc_auc_results(save_folder, results, evaluate_keys, data_label)
-    metric_results(save_folder, auc_scores, results, evaluate_keys, data_label)
+    # # Visualize the results
+    # auc_scores = cm_roc_auc_results(save_folder, results, evaluate_keys, data_label)
+    # metric_results(save_folder, auc_scores, results, evaluate_keys, data_label)
 
-    # Visualize t-SNE
-    tsne_df = fit_tsne(outputs, all_feature_indices, feature_idx_names, data_label, results[final_feature_selection]['Predicted'])
-    visualize_tsne(save_folder, tsne_df)
+    # # Visualize t-SNE
+    # tsne_df = fit_tsne(outputs, all_feature_indices, feature_idx_names, data_label, results[final_feature_selection]['Predicted'])
+    # visualize_tsne(save_folder, tsne_df)
 
     # Extract the final results
     save_results(save_folder, results, final_feature_selection)
@@ -248,7 +256,7 @@ def main():
         print("Training the model") if models is None else print("Using previous model")
         save_folder = anomalous_path / 'train'
         outputs, column_2_idx = load_model_outputs(save_folder)
-        outputs, column_2_idx = add_steps_ahead(evaulation_path / 'train' / 'output.pkl', outputs, column_2_idx)
+        #outputs, column_2_idx = add_steps_ahead(evaulation_path / 'train' / 'output.pkl', outputs, column_2_idx)
         # get the features
         models = run_anomaly_detection(models, 'train', final_feature_selection, anomalous_path, outputs, column_2_idx)
         print("")
@@ -258,7 +266,7 @@ def main():
         print("Training the model") if models is None else print("Using previous model")
         save_folder = anomalous_path / 'val'
         outputs, column_2_idx = load_model_outputs(save_folder)
-        outputs, column_2_idx = add_steps_ahead(evaulation_path / 'val' / 'output.pkl', outputs, column_2_idx)
+        #outputs, column_2_idx = add_steps_ahead(evaulation_path / 'val' / 'output.pkl', outputs, column_2_idx)
         # get the features
         models = run_anomaly_detection(models, 'val', final_feature_selection, anomalous_path, outputs, column_2_idx)
         print("")
@@ -268,7 +276,7 @@ def main():
         print("Training the model") if models is None else print("Using previous model")
         save_folder = anomalous_path / 'test'
         outputs, column_2_idx = load_model_outputs(save_folder)
-        outputs, column_2_idx = add_steps_ahead(evaulation_path / 'test' / 'output.pkl', outputs, column_2_idx)
+        #outputs, column_2_idx = add_steps_ahead(evaulation_path / 'test' / 'output.pkl', outputs, column_2_idx)
         # get the features
         models = run_anomaly_detection(models, 'test', final_feature_selection, anomalous_path, outputs, column_2_idx)
         print("")

@@ -14,6 +14,7 @@ import pandas as pd
 import torch
 from captum.attr import IntegratedGradients
 from sklearn.decomposition import PCA
+from sklearn.decomposition import IncrementalPCA
 from sklearn.preprocessing import StandardScaler
 
 
@@ -92,28 +93,54 @@ def load_run_info(experiment_folder, data_type, subset=None):
     return config, run_folder, data_indices, scalers, run_info
 
 
-def apply_pca(ig_results, pca=None, scaler=None, explain_variance=0.95):
-    # if none, then fit
+# def apply_pca(ig_results, pca=None, scaler=None, explain_variance=0.95):
+#     # if none, then fit
+#     if pca is None:
+#         # Standardize the data
+#         scaler = StandardScaler()
+#         # fit the scaler
+#         scaler.fit(ig_results)
+#         # Apply PCA to the IG results
+#         pca = PCA(n_components=explain_variance, svd_solver='full')
+#         # Fit the PCA
+#         pca.fit(ig_results)
+#     else:
+#         print("Using the provided PCA")
+    
+#     # Scale the data
+#     ig_results = scaler.transform(ig_results)
+
+#     # Transform the data
+#     ig_results_pca = pca.transform(ig_results)
+#     print(f"Original IG shape: {ig_results.shape}, PCA IG shape: {ig_results_pca.shape}")
+#     print(f"Explained variance: {pca.explained_variance_ratio_.sum()}")
+#     print(f"N components: {pca.n_components_}")
+#     return ig_results_pca, pca, scaler
+
+def apply_pca(ig_results, pca=None, scaler=None, explain_variance=0.95, batch_size=1000):
     if pca is None:
-        # Standardize the data
         scaler = StandardScaler()
-        # fit the scaler
         scaler.fit(ig_results)
-        # Apply PCA to the IG results
-        pca = PCA(n_components=explain_variance, svd_solver='full')
-        # Fit the PCA
-        pca.fit(ig_results)
+        ig_results_scaled = scaler.transform(ig_results)
+        
+        # Use Incremental PCA instead of standard PCA
+        pca = IncrementalPCA(n_components=explain_variance, batch_size=batch_size)
+        
+        for i in range(0, ig_results_scaled.shape[0], batch_size):
+            batch = ig_results_scaled[i:i + batch_size]
+            pca.partial_fit(batch)  # Fit incrementally
+        # Indicate variance explained
+        print(f"Explained variance: {pca.explained_variance_ratio_.sum()}")
+        
     else:
         print("Using the provided PCA")
-    
-    # Scale the data
-    ig_results = scaler.transform(ig_results)
+        ig_results_scaled = scaler.transform(ig_results)
 
-    # Transform the data
-    ig_results_pca = pca.transform(ig_results)
+    ig_results_pca = pca.transform(ig_results_scaled)
     print(f"Original IG shape: {ig_results.shape}, PCA IG shape: {ig_results_pca.shape}")
     print(f"Explained variance: {pca.explained_variance_ratio_.sum()}")
     print(f"N components: {pca.n_components_}")
+    
     return ig_results_pca, pca, scaler
 
 
@@ -190,8 +217,8 @@ def features(model, dataset, scalers, config, pca, scaler, num_workers=0):
 
     # Reduce IG dims with PCA
     #explain_variance = 0.95
-    explain_variance = 10 # use 10 components
-    ig_results, pca, scaler = apply_pca(ig_results, pca=pca, scaler=scaler, explain_variance=explain_variance)
+    explain_variance = 20 # use 10 components
+    ig_results, pca, scaler = apply_pca(ig_results, pca=pca, scaler=scaler, explain_variance=explain_variance, batch_size=10000)
 
     return ig_results, pca, scaler
 

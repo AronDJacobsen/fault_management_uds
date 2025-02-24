@@ -9,7 +9,7 @@
 ### General options
 ### –- specify queue --
 # possible: gpuv100, gpua100, gpua10, gpua40
-#BSUB -q gpua10
+#BSUB -q gpuv100
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 4
 ### -- Select the resources: 1 gpu in exclusive process mode --
@@ -51,16 +51,15 @@ cd /work3/s194262/GitHub/fault_management_uds
 #python fault_management_uds/train_model.py --config "transformer/7_anomalous/0_iteration.yaml" --num_workers 0
 
 # Get features:
+python fault_management_uds/get_integrated_gradients.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
 #python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
-#python fault_management_uds/get_integrated_gradients.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
-
 # fast:
-#python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0 --fast_run True
 #python fault_management_uds/get_integrated_gradients.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0 --fast_run True
+#python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0 --fast_run True
 
 
 # Evaluation:
-python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_group "anomalous" --num_workers 0
 
 
 # Iteration (old):

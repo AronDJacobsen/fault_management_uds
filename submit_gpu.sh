@@ -9,7 +9,7 @@
 ### General options
 ### –- specify queue --
 # possible: gpuv100, gpua100, gpua10, gpua40
-#BSUB -q gpuv100
+#BSUB -q gpua10
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 4
 ### -- Select the resources: 1 gpu in exclusive process mode --
@@ -59,8 +59,10 @@ cd /work3/s194262/GitHub/fault_management_uds
 
 
 # Evaluation:
-python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_group "anomalous" --num_workers 0
 
+# Detection results:
+python notebooks/4_anomalous/2_detection_results.py
 
 # Iteration (old):
 #python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.0_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0_250106_0752" --num_workers 0

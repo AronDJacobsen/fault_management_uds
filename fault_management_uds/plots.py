@@ -573,30 +573,48 @@ def cm_roc_auc_results(save_folder, results, evaluate_keys, data_label):
 #             str_value = data_fmt[i, j]
 #             ax.text(j + 0.5, i + 0.5, str_value, ha="center", va="center", color=text_color, **text_kwargs)
 
+
 def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True, annotate_row_wise=True):
 
-    norm = Normalize(vmin=data.min(), vmax=data.max())
+    norm = Normalize(vmin=np.nanmin(data), vmax=np.nanmax(data))
     cmap = plt.get_cmap(cmap)
     
     for i in range(data.shape[0]):  # Iterate over rows
         for j in range(data.shape[1]):  # Iterate over columns
             value = data[i, j]
+            # check if nan
+            if np.isnan(value):
+                continue
+            # if annotate_row_wise:
+            #     _high_best = high_best[i] if isinstance(high_best, list) else high_best
+            #     is_max = value == data[i].max() if _high_best else value == data[i].min()
+            # else:  # Annotate column-wise
+            #     _high_best = high_best[j] if isinstance(high_best, list) else high_best
+            #     is_max = value == data[:, j].max() if _high_best else value == data[:, j].min()
+
             if annotate_row_wise:
                 _high_best = high_best[i] if isinstance(high_best, list) else high_best
-                is_max = value == data[i].max() if _high_best else value == data[i].min()
+                if _high_best == 0:
+                    is_best = abs(value) == np.min(np.abs(data[i]))  # Closest to zero
+                else:
+                    is_best = value == data[i].max() if _high_best else value == data[i].min()
             else:  # Annotate column-wise
                 _high_best = high_best[j] if isinstance(high_best, list) else high_best
-                is_max = value == data[:, j].max() if _high_best else value == data[:, j].min()
+                if _high_best == 0:
+                    is_best = abs(value) == np.min(np.abs(data[:, j]))  # Closest to zero
+                else:
+                    is_best = value == data[:, j].max() if _high_best else value == data[:, j].min()
+            
 
-            text_kwargs = {"weight": "bold"} if is_max else {}
+
+            text_kwargs = {"weight": "bold"} if is_best else {}
             
-            # Get the background color for the cell
-            bg_color = cmap(norm(value))
-            
-            # Determine text color (white or black) based on brightness
+            # Get text color
+            bg_color = cmap(norm(value))  # Get the color from colormap
             brightness = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
-            text_color = "white" if brightness < 0.80 else "black"
-            
+            text_color = "white" if brightness < 0.8 else "black"
+
+
             # Add text annotation
             str_value = data_fmt[i, j]
             ax.text(j + 0.5, i + 0.5, str_value, ha="center", va="center", color=text_color, **text_kwargs)
@@ -634,7 +652,6 @@ def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best
     else:
         plt.savefig(save_folder / f'metric_{metric}.png', dpi=150)
         plt.close()
-
 
 
 

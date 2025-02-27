@@ -591,20 +591,21 @@ def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True, annotate_
             # else:  # Annotate column-wise
             #     _high_best = high_best[j] if isinstance(high_best, list) else high_best
             #     is_max = value == data[:, j].max() if _high_best else value == data[:, j].min()
-
-            if annotate_row_wise:
-                _high_best = high_best[i] if isinstance(high_best, list) else high_best
-                if _high_best == 0:
-                    is_best = abs(value) == np.min(np.abs(data[i]))  # Closest to zero
-                else:
-                    is_best = value == data[i].max() if _high_best else value == data[i].min()
-            else:  # Annotate column-wise
-                _high_best = high_best[j] if isinstance(high_best, list) else high_best
-                if _high_best == 0:
-                    is_best = abs(value) == np.min(np.abs(data[:, j]))  # Closest to zero
-                else:
-                    is_best = value == data[:, j].max() if _high_best else value == data[:, j].min()
-            
+            if high_best is not None:
+                if annotate_row_wise:
+                    _high_best = high_best[i] if isinstance(high_best, list) else high_best
+                    if _high_best == 0:
+                        is_best = abs(value) == np.min(np.abs(data[i]))  # Closest to zero
+                    else:
+                        is_best = value == data[i].max() if _high_best else value == data[i].min()
+                else:  # Annotate column-wise
+                    _high_best = high_best[j] if isinstance(high_best, list) else high_best
+                    if _high_best == 0:
+                        is_best = abs(value) == np.min(np.abs(data[:, j]))  # Closest to zero
+                    else:
+                        is_best = value == data[:, j].max() if _high_best else value == data[:, j].min()
+            else:
+                is_best = False
 
 
             text_kwargs = {"weight": "bold"} if is_best else {}

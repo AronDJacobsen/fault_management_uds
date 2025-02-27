@@ -9,13 +9,13 @@
 ### General options
 ### –- specify queue --
 # possible: gpuv100, gpua100, gpua10, gpua40
-#BSUB -q gpua10
+#BSUB -q gpuv100
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 4
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
-#BSUB -W 06:00
+#BSUB -W 09:00
 ### -- request _ GB of system-memory --
 #BSUB -R "rusage[mem=32GB]"
 #BSUB -R "span[hosts=1]"
@@ -58,14 +58,12 @@ cd /work3/s194262/GitHub/fault_management_uds
 #python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0 --fast_run True
 
 
-# Evaluation:
-#python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_group "anomalous" --num_workers 0
-
+# Anomaly Detection:
+#python fault_management_uds/get_detection.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_group "anomalous" --num_workers 0
 # Detection results:
-python notebooks/4_anomalous/2_detection_results.py
+#python fault_management_uds/detection_results.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_types "train" "val" "test"
+#python fault_management_uds/detection_results.py --model_save_path "transformer/7_anomalous/iteration=0_250206_0903" --data_types "test"
 
-# Iteration (old):
-#python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.0_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0_250106_0752" --num_workers 0
 
 #------------------------------------------------------------
 ### -- 1. Iteration --
@@ -73,25 +71,28 @@ python notebooks/4_anomalous/2_detection_results.py
 
 ### Iteration 0.0
 # Train model:
-#python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.0_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0_250106_0752" --num_workers 0
+#python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.0_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0_250206_0903" --num_workers 0
 
 # Get features:
-#python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0.0_250107_1459" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/get_integrated_gradients.py --model_save_path "transformer/7_anomalous/iteration=0.0_250226_1007" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0.0_250226_1007" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
 
-# Evaluation:
-#python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0.0_250107_1459" --data_group "anomalous" --num_workers 0
+# Anomaly Detection:
+#python fault_management_uds/get_detection.py --model_save_path "transformer/7_anomalous/iteration=0.0_250226_1007" --data_group "anomalous" --num_workers 0
+# Don't need the results
 
 
 ### Iteration 0.1
 # Train model:
-#python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.1_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0_250106_0752" --num_workers 0
+#python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.1_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0_250206_0903" --num_workers 0
 
 # Get features:
-#python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0.1_250107_1455" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/get_integrated_gradients.py --model_save_path "transformer/7_anomalous/iteration=0.1_250226_1056" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0.1_250226_1056" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
 
-# Evaluation:
-#python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0.1_250107_1455" --data_group "anomalous" --num_workers 0
-
+# Anomaly Detection:
+#python fault_management_uds/get_detection.py --model_save_path "transformer/7_anomalous/iteration=0.1_250226_1056" --data_group "anomalous" --num_workers 0
+# Don't need the results
 
 
 #------------------------------------------------------------
@@ -101,25 +102,25 @@ python notebooks/4_anomalous/2_detection_results.py
 ### Iteration 0.0.0
 #python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.0.0_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0.0_250107_1459" --num_workers 0
 #python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0.0.0_250108_2052" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
-#python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0.0.0_250108_2052" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/get_detection.py --model_save_path "transformer/7_anomalous/iteration=0.0.0_250108_2052" --data_group "anomalous" --num_workers 0
 
 
 ### Iteration 0.0.1
 #python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.0.1_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0.0_250107_1459" --num_workers 0
 #python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0.0.1_250108_2105" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
-#python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0.0.1_250108_2105" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/get_detection.py --model_save_path "transformer/7_anomalous/iteration=0.0.1_250108_2105" --data_group "anomalous" --num_workers 0
 
 
 ### Iteration 0.1.0
 #python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.1.0_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0.1_250107_1455" --num_workers 0
 #python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0.1.0_250108_2222" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
-#python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0.1.0_250108_2222" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/get_detection.py --model_save_path "transformer/7_anomalous/iteration=0.1.0_250108_2222" --data_group "anomalous" --num_workers 0
 
 
 ### Iteration 0.1.1
 #python fault_management_uds/train_model.py --config "transformer/7_anomalous/0.1.1_iteration.yaml" --fine_tune_path "transformer/7_anomalous/iteration=0.1_250107_1455" --num_workers 0
 #python fault_management_uds/get_features.py --model_save_path "transformer/7_anomalous/iteration=0.1.1_250108_2117" --data_types "train" "val" "test" --data_group "anomalous" --num_workers 0
-#python fault_management_uds/evaluate_detection.py --model_save_path "transformer/7_anomalous/iteration=0.1.1_250108_2117" --data_group "anomalous" --num_workers 0
+#python fault_management_uds/get_detection.py --model_save_path "transformer/7_anomalous/iteration=0.1.1_250108_2117" --data_group "anomalous" --num_workers 0
 
 
 

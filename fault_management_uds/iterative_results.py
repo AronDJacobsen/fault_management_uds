@@ -15,7 +15,7 @@ from fault_management_uds.config import MODELS_DIR, REPORTS_DIR, FIGURES_DIR, RE
 from fault_management_uds.config import rain_gauge_color, condition_to_meta
 
 
-from fault_management_uds.evaluate_detection import load_model_outputs, add_steps_ahead, run_anomaly_detection
+from fault_management_uds.get_detection import load_model_outputs, add_steps_ahead, run_anomaly_detection, get_features
 
 
 
@@ -50,7 +50,7 @@ def main():
 
     # Have to run test to the get the model outputs
     models = None
-    for data_type in ["train", "test"]:
+    for data_type in ["train", "val", "test"]:
         # Find all model outputs
         all_runs = os.listdir(save_folder)
         all_runs = [run for run in all_runs if run.startswith(prefix)]
@@ -65,15 +65,20 @@ def main():
 
 
         # Collect all model outputs into one
-        # Iterate over all model outputs
+        # Iterate over all model outputs, col 2 idx is same for all
         model_outputs = []
         for run in runs:
             # Load outputs (multiple)
             outputs_folder = save_folder / run / ano_relative_path / data_type
             outputs, column_2_idx = load_model_outputs(outputs_folder)
-            # Load steps ahead output
-            evaluation_folder = save_folder / run / eval_relative_path / data_type
-            outputs, column_2_idx = add_steps_ahead(evaluation_folder / 'output.pkl', outputs, column_2_idx)
+            feature_columns, column_2_idx, data_label = get_features(outputs, column_2_idx)
+
+
+            # outputs_folder = save_folder / run / ano_relative_path / data_type
+            # outputs, column_2_idx = load_model_outputs(outputs_folder)
+            # # Load steps ahead output
+            # evaluation_folder = save_folder / run / eval_relative_path / data_type
+            # outputs, column_2_idx = add_steps_ahead(evaluation_folder / 'output.pkl', outputs, column_2_idx)
             model_outputs.append(outputs)
         
         # Combine all model outputs
@@ -87,7 +92,7 @@ def main():
 
         # Run the evaluation
         #final_feature_selection = 
-        final_feature_selection = "Combined"
+        final_feature_selection = "Multi-Feature"
         # Create a new path for the anomalous data
         anomalous_path = save_folder / f"combined_iteration={iteration}"
         full_path = anomalous_path / data_type

@@ -12,6 +12,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.metrics import roc_curve
+
 
 from fault_management_uds.plots import visualize_pca, cm_roc_auc_results, metric_results, fit_pca, fit_tsne, visualize_tsne
 from fault_management_uds.modelling.classifiers import detect_anomalies
@@ -50,17 +52,21 @@ def load_model_outputs(outputs_path):
                     for k, v in column_2_idx.items()}
     print(f"Column 2 idx: {list(column_2_idx.keys())}")
 
+    # Update: Lowercase the keys
+    column_2_idx = {key.lower(): value for key, value in column_2_idx.items()}
+
+
     # Handle features
     remove_last = 0
-    if 'Final hidden' in column_2_idx:
+    if 'final hidden' in column_2_idx:
         # Shift it by 1 and remove the last one
-        final_hidden_idx = column_2_idx['Final hidden']
+        final_hidden_idx = column_2_idx['final hidden']
         outputs[:, final_hidden_idx] = np.roll(outputs[:, final_hidden_idx], -1) # shift by 1 back
         remove_last = max(remove_last, 1)
 
-    if 'IG' in column_2_idx:
+    if 'ig' in column_2_idx:
         # Shift it by 1 and remove the last one
-        integrated_gradients_idx = column_2_idx['IG']
+        integrated_gradients_idx = column_2_idx['ig']
         outputs[:, integrated_gradients_idx] = np.roll(outputs[:, integrated_gradients_idx], -1) # shift by 1 back
         remove_last = max(remove_last, 1)
 
@@ -119,111 +125,134 @@ def load_model_outputs(outputs_path):
 
 
 def get_features(outputs, column_2_idx):
-    feature_columns = ['Target', 'Residuals', 'Final hidden', 'IG', 'PIG',] # don't use the 'residual'
-    feature_columns = [x for x in feature_columns if x in column_2_idx]
-    feature_2_idx = {k: column_2_idx[k] for k in feature_columns}
-    all_feature_indices = []
-    feature_idx_names = []
-    for k in feature_columns:
-        all_feature_indices.extend(feature_2_idx[k])
+    
+    #feature_columns = ['Target', 'Residuals', 'Final hidden', 'IG', 'PIG',] # don't use the 'residual'
+    feature_columns = ['Target', 'Final Hidden', 'Residuals', 'IG']#, 'Multi-Feature']
 
-        feature_idx_names.extend([k + '_' + str(len(feature_2_idx[k])-i) if len(feature_2_idx[k]) > 1 else k for i in range(len(feature_2_idx[k]))])
+    feature_columns = [x for x in feature_columns if x.lower() in column_2_idx]
+    #feature_2_idx = {k: column_2_idx[k.lower()] for k in feature_columns}
+    all_feature_indices = []
+    #feature_idx_names = []
+    for k in feature_columns:
+        all_feature_indices.extend(column_2_idx[k.lower()])
+
+        #feature_idx_names.extend([k + '_' + str(len(feature_2_idx[k])-i) if len(feature_2_idx[k]) > 1 else k for i in range(len(feature_2_idx[k]))])
+
+
+    # Add the Multi-Feature
+    feature_columns.append('Multi-Feature')
+    column_2_idx['multi-feature'] = all_feature_indices
+    #feature_idx_names.append('Multi-Feature')
+    
+    print(f"Feature columns: {feature_columns}")
+
 
     # get the coloring variable
-    data_label = outputs[:, column_2_idx['Data label']].flatten()
+    data_label = outputs[:, column_2_idx['data label']].flatten()
     # convert to label using indicator_2_data_label
     data_label = [indicator_2_data_label[str(int(x))] for x in data_label]
 
-    return feature_columns, feature_2_idx, all_feature_indices, feature_idx_names, data_label
+    return feature_columns, column_2_idx, data_label
 
 
 
-def get_anomaly_detection_results(models, outputs, column_2_idx, feature_columns, feature_2_idx, all_feature_indices, data_label):
+def get_anomaly_detection_results(models, outputs, column_2_idx, feature_columns, data_label):
+
     results = {
-        'Valid index': outputs[:, column_2_idx['Valid index']].flatten(),
-        'Starttime': outputs[:, column_2_idx['Starttime']].flatten(),
+        'Valid index': outputs[:, column_2_idx['valid index']].flatten(),
+        'Starttime': outputs[:, column_2_idx['starttime']].flatten(),
         'Data label': data_label,
-        'Actual': (outputs[:, column_2_idx['Data label']].flatten()!=0).astype(int),
+        'Actual': (outputs[:, column_2_idx['data label']].flatten()!=0).astype(int),
     }
 
     # NOTE: IsolationForest is the only applicable model
     model_name = 'IsolationForest' # ['IsolationForest', 'OneClassSVM', 'LOF']
 
-    evaluate_keys = ['Combined'] + feature_columns
+
+
     # Initialize models
     if models is None:
-        models = {k: None for k in evaluate_keys}
-    evaluate_2_idx = feature_2_idx
-    evaluate_2_idx['Combined'] = all_feature_indices
+        models = {k: None for k in feature_columns}
+    # evaluate_2_idx = feature_2_idx
+    # evaluate_2_idx["Multi-Feature"] = all_feature_indices
 
     # Now generate results for each feature column
-    for feature in evaluate_keys:
-        feature_indices = evaluate_2_idx[feature]
+    for feature in feature_columns:
+        feature_indices = column_2_idx[feature.lower()]
         predicted_anomalies, decision_function, models[feature] = detect_anomalies(model_name, models[feature], outputs[:, feature_indices])
         results[feature] = {
             'Predicted': predicted_anomalies,
             'Decision Function': decision_function,
         }
 
-    return results, evaluate_keys, models
+    return results, models
 
 
 
-def save_results(save_folder, results, final_feature_selection):
-    final_results = {
-        # useful for splitting data
-        '1': results['Valid index'][results[final_feature_selection]['Predicted'] == 1],
-        '0': results['Valid index'][results[final_feature_selection]['Predicted'] == 0],
-        'true_1': results['Valid index'][results['Actual'] == 1],
-        'true_0': results['Valid index'][results['Actual'] == 0],
+def save_results(save_folder, results, final_method_selection):
+    # final_results = {
+    #     # useful for splitting data
+    #     '1': results['Valid index'][results[final_method_selection]['Predicted'] == 1],
+    #     '0': results['Valid index'][results[final_method_selection]['Predicted'] == 0],
+    #     'true_1': results['Valid index'][results['Actual'] == 1],
+    #     'true_0': results['Valid index'][results['Actual'] == 0],
 
-        'starttimes': results['Starttime'],
-        'valid_index': results['Valid index'], 
+    #     'starttimes': results['Starttime'],
+    #     'valid_index': results['Valid index'], 
 
-        # decision function
-        'decision_function': results[final_feature_selection]['Decision Function'],
-        'predicted': results[final_feature_selection]['Predicted'],
-        'actual': results['Actual'], # actual anomaly
-        'data_label': results['Data label'], # actual data label
+    #     'final_method_selection': final_method_selection,
 
-    }
-    # Save the results
-    with open(save_folder / 'anomaly_prediction_results.pkl', 'wb') as f:
-        pickle.dump(final_results, f)
+    #     # decision function
+    #     'decision_function': results[final_method_selection]['Decision Function'],
+    #     'predicted': results[final_method_selection]['Predicted'],
+    #     'actual': results['Actual'], # actual anomaly
+    #     'data_label': results['Data label'], # actual data label
 
-    print(f"Results saved at {save_folder / 'anomaly_prediction_results.pkl'}")
+    # }
+    # # Save the results
+    # with open(save_folder / 'anomaly_prediction_results.pkl', 'wb') as f:
+    #     pickle.dump(final_results, f)
+
+    # print(f"Results saved at {save_folder / 'anomaly_prediction_results.pkl'}")
 
     # and save the complete results
-    with open(save_folder / 'anomaly_prediction_results_full.pkl', 'wb') as f:
+    results['final_method_selection'] = final_method_selection
+    results['1'] = results['Valid index'][results[final_method_selection]['Predicted'] == 1]
+    results['0'] = results['Valid index'][results[final_method_selection]['Predicted'] == 0]
+
+
+    with open(save_folder / 'anomaly_prediction_results.pkl', 'wb') as f:
         pickle.dump(results, f)
 
-    print(f"Full results saved at {save_folder / 'anomaly_prediction_results_full.pkl'}")
+    print(f"Full results saved at {save_folder / 'anomaly_prediction_results.pkl'}")
 
 
 
-def run_anomaly_detection(models, data_type, final_feature_selection, anomalous_path, outputs, column_2_idx):
+def run_anomaly_detection(models, data_type, final_method_selection, anomalous_path, outputs, column_2_idx):
     save_folder = anomalous_path / data_type
     
     # get the features
-    feature_columns, feature_2_idx, all_feature_indices, feature_idx_names, data_label = get_features(outputs, column_2_idx)
+    feature_columns, column_2_idx, data_label = get_features(outputs, column_2_idx)
 
-    # Visualize PCA
-    pca_df, explained_variance, loadings = fit_pca(outputs, all_feature_indices, feature_idx_names, data_label)
-    visualize_pca(save_folder, pca_df, explained_variance, loadings, 20)
+    # # Visualize PCA
+    # pca_df, explained_variance, loadings = fit_pca(outputs, all_feature_indices, feature_idx_names, data_label)
+    # visualize_pca(save_folder, pca_df, explained_variance, loadings, 20)
 
     # Anomaly detection
-    results, evaluate_keys, models = get_anomaly_detection_results(models, outputs, column_2_idx, feature_columns, feature_2_idx, all_feature_indices, data_label)
+    results, models = get_anomaly_detection_results(models, outputs, column_2_idx, feature_columns, data_label)
+
 
     # # Visualize the results
     # auc_scores = cm_roc_auc_results(save_folder, results, evaluate_keys, data_label)
     # metric_results(save_folder, auc_scores, results, evaluate_keys, data_label)
 
     # # Visualize t-SNE
-    # tsne_df = fit_tsne(outputs, all_feature_indices, feature_idx_names, data_label, results[final_feature_selection]['Predicted'])
+    # tsne_df = fit_tsne(outputs, all_feature_indices, feature_idx_names, data_label, results[final_method_selection]['Predicted'])
     # visualize_tsne(save_folder, tsne_df)
 
+
     # Extract the final results
-    save_results(save_folder, results, final_feature_selection)
+    save_results(save_folder, results, final_method_selection)
 
     return models
 
@@ -246,8 +275,12 @@ def main():
     data_types = os.listdir(anomalous_path)
     print(f"Data types available: {data_types}")
 
+    # # Ensure data types are in the correct order
+    # dt_order = ['train', 'val', 'test']
+    # data_types = [dt for dt in dt_order if dt in data_types]
+
     models = None # to store the models
-    final_feature_selection = "Combined"
+    final_method_selection = "Multi-Feature"
 
     # train the anomaly detection on training set, and apply it on all
     if 'train' in data_types:
@@ -258,7 +291,7 @@ def main():
         outputs, column_2_idx = load_model_outputs(save_folder)
         #outputs, column_2_idx = add_steps_ahead(evaulation_path / 'train' / 'output.pkl', outputs, column_2_idx)
         # get the features
-        models = run_anomaly_detection(models, 'train', final_feature_selection, anomalous_path, outputs, column_2_idx)
+        models = run_anomaly_detection(models, 'train', final_method_selection, anomalous_path, outputs, column_2_idx)
         print("")
 
     if 'val' in data_types:
@@ -268,7 +301,7 @@ def main():
         outputs, column_2_idx = load_model_outputs(save_folder)
         #outputs, column_2_idx = add_steps_ahead(evaulation_path / 'val' / 'output.pkl', outputs, column_2_idx)
         # get the features
-        models = run_anomaly_detection(models, 'val', final_feature_selection, anomalous_path, outputs, column_2_idx)
+        models = run_anomaly_detection(models, 'val', final_method_selection, anomalous_path, outputs, column_2_idx)
         print("")
 
     if 'test' in data_types:
@@ -278,8 +311,88 @@ def main():
         outputs, column_2_idx = load_model_outputs(save_folder)
         #outputs, column_2_idx = add_steps_ahead(evaulation_path / 'test' / 'output.pkl', outputs, column_2_idx)
         # get the features
-        models = run_anomaly_detection(models, 'test', final_feature_selection, anomalous_path, outputs, column_2_idx)
+        models = run_anomaly_detection(models, 'test', final_method_selection, anomalous_path, outputs, column_2_idx)
         print("")
+
+    # TODO: update the thresholds
+    # ensure val is in the data_types
+    if 'val' in data_types:
+        print("Updating thresholds")
+
+
+        # Load the results
+        with open(anomalous_path / "val" / 'anomaly_prediction_results.pkl', 'rb') as f:
+            results = pickle.load(f)
+
+        methods = ['Target', 'Final Hidden', 'Residuals', 'IG', 'Multi-Feature']
+        # create thresholds
+        optimal_thresholds = {}
+        for i, key in enumerate(methods):
+            # ROC curve
+            fpr, tpr, thresholds = roc_curve(results['Actual'], results[key]['Decision Function'])
+
+            # Don't use the first and last threshold
+            fpr = fpr[1:-1]
+            tpr = tpr[1:-1]
+            thresholds = thresholds[1:-1]
+
+            # Calculate Youden's index
+            youden_index = tpr - fpr
+            optimal_threshold = thresholds[np.argmax(youden_index)]
+
+            print(f'Optimal Threshold for {key}: {optimal_threshold}')
+            optimal_thresholds[key] = optimal_threshold
+
+        # Save the optimal thresholds
+        with open(anomalous_path / 'optimal_thresholds.pkl', 'wb') as f:
+            pickle.dump(optimal_thresholds, f)
+
+        # update the anomaly detection results
+        update_thresholds(methods, 'train', anomalous_path)
+        update_thresholds(methods, 'val', anomalous_path)
+        update_thresholds(methods, 'test', anomalous_path)
+
+        # for method in methods:
+        #     results[method]['Predicted'] = (results[method]['Decision Function'] > optimal_thresholds[method]).astype(int)
+        # # Update the final method selection results
+        # final_method_selection = results['final_method_selection']
+        # results['1'] = results['Valid index'][results[final_method_selection]['Predicted'] == 1]
+        # results['0'] = results['Valid index'][results[final_method_selection]['Predicted'] == 0]
+
+    else:
+        print("Validation data not available. Skipping threshold update")
+
+
+
+
+def update_thresholds(methods, data_type, anomalous_path):
+
+    # load the results
+    with open(anomalous_path / data_type / 'anomaly_prediction_results.pkl', 'rb') as f:
+        results = pickle.load(f)
+
+    # load the optimal thresholds (ensure path exists)
+    with open(anomalous_path / 'optimal_thresholds.pkl', 'rb') as f:
+        optimal_thresholds = pickle.load(f)
+
+
+    # update the anomaly detection results
+    for method in methods:
+        results[method]['Predicted'] = (results[method]['Decision Function'] > optimal_thresholds[method]).astype(int)
+        # Save the theshold
+        results[method]['Optimal Threshold'] = optimal_thresholds[method]
+    
+    # Update the final method selection results
+    final_method_selection = results['final_method_selection']
+    results['1'] = results['Valid index'][results[final_method_selection]['Predicted'] == 1]
+    results['0'] = results['Valid index'][results[final_method_selection]['Predicted'] == 0]
+
+    # Save the results
+    with open(anomalous_path / data_type / 'anomaly_prediction_results.pkl', 'wb') as f:
+        pickle.dump(results, f)
+
+
+
 
 
 if __name__ == '__main__':

@@ -381,7 +381,6 @@ def main():
         save_path = MODELS_DIR / model_save_path / '1_split' / 'anomalous' / data_type / 'ig_results.pkl'
         outputs, column_2_idx = add_integrated_gradients(save_path, outputs, column_2_idx)
 
-
         # Add the steps ahead residuals
         save_path = MODELS_DIR / model_save_path / '1_split' / 'evaluation' / data_type / 'output.pkl'
         use_steps_ahead = config["predict_steps_ahead"] # use steps ahead as by the model

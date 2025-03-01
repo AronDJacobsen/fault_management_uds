@@ -258,6 +258,35 @@ def run_anomaly_detection(models, data_type, final_method_selection, anomalous_p
 
 
 
+
+def update_thresholds(methods, data_type, anomalous_path):
+
+    # load the results
+    with open(anomalous_path / data_type / 'anomaly_prediction_results.pkl', 'rb') as f:
+        results = pickle.load(f)
+
+    # load the optimal thresholds (ensure path exists)
+    with open(anomalous_path / 'optimal_thresholds.pkl', 'rb') as f:
+        optimal_thresholds = pickle.load(f)
+
+
+    # update the anomaly detection results
+    for method in methods:
+        results[method]['Predicted'] = (results[method]['Decision Function'] > optimal_thresholds[method]).astype(int)
+        # Save the theshold
+        results[method]['Optimal Threshold'] = optimal_thresholds[method]
+    
+    # Update the final method selection results
+    final_method_selection = results['final_method_selection']
+    results['1'] = results['Valid index'][results[final_method_selection]['Predicted'] == 1]
+    results['0'] = results['Valid index'][results[final_method_selection]['Predicted'] == 0]
+
+    # Save the results
+    with open(anomalous_path / data_type / 'anomaly_prediction_results.pkl', 'wb') as f:
+        pickle.dump(results, f)
+
+
+
         
 
 
@@ -361,36 +390,6 @@ def main():
 
     else:
         print("Validation data not available. Skipping threshold update")
-
-
-
-
-def update_thresholds(methods, data_type, anomalous_path):
-
-    # load the results
-    with open(anomalous_path / data_type / 'anomaly_prediction_results.pkl', 'rb') as f:
-        results = pickle.load(f)
-
-    # load the optimal thresholds (ensure path exists)
-    with open(anomalous_path / 'optimal_thresholds.pkl', 'rb') as f:
-        optimal_thresholds = pickle.load(f)
-
-
-    # update the anomaly detection results
-    for method in methods:
-        results[method]['Predicted'] = (results[method]['Decision Function'] > optimal_thresholds[method]).astype(int)
-        # Save the theshold
-        results[method]['Optimal Threshold'] = optimal_thresholds[method]
-    
-    # Update the final method selection results
-    final_method_selection = results['final_method_selection']
-    results['1'] = results['Valid index'][results[final_method_selection]['Predicted'] == 1]
-    results['0'] = results['Valid index'][results[final_method_selection]['Predicted'] == 0]
-
-    # Save the results
-    with open(anomalous_path / data_type / 'anomaly_prediction_results.pkl', 'wb') as f:
-        pickle.dump(results, f)
-
 
 
 

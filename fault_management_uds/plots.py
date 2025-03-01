@@ -432,18 +432,34 @@ def visualize_confusion(ax, i, key, conf_matrix, fmt, cmap):
     return ax
 
 
-def visualize_roc_auc(ax, i, key, fpr, tpr, roc_auc):
-    ax.plot(fpr, tpr, color='darkorange', lw=2, label='AUC: %0.2f' % roc_auc)
+# def visualize_roc_auc(ax, i, key, fpr, tpr, roc_auc):
+#     ax.plot(fpr, tpr, color='darkorange', lw=2, label='AUC: %0.2f' % roc_auc)
+#     ax.plot([0, 1], [0, 1], color='grey', lw=1, linestyle='--', label='Random')
+#     ax.set_xlim([0.0, 1.0])
+#     ax.set_ylim([0.0, 1.05])
+#     if i == 0:
+#         ax.set_ylabel('TPR', fontsize=12)
+#         ax.set_xlabel('FPR', fontsize=12)
+#     ax.legend(loc='lower right')
+#     ax.set_title(key, fontsize=14)
+#     return ax
+
+
+def visualize_roc_auc(ax, i, key, fpr, tpr, roc_auc, optimal_fpr=None, optimal_tpr=None):   
+    ax.plot(fpr, tpr, color='darkorange', lw=2, label="ROC")#, label='AUC: %0.2f' % roc_auc)
     ax.plot([0, 1], [0, 1], color='grey', lw=1, linestyle='--', label='Random')
+    # plot optimal if specified
+    if optimal_fpr is not None and optimal_tpr is not None:
+        ax.plot(optimal_fpr, optimal_tpr, marker='o', markersize=4, color='navy', label='Threshold')
+
     ax.set_xlim([0.0, 1.0])
     ax.set_ylim([0.0, 1.05])
     if i == 0:
-        ax.set_ylabel('TPR', fontsize=12)
-        ax.set_xlabel('FPR', fontsize=12)
-    ax.legend(loc='lower right')
-    ax.set_title(key, fontsize=14)
+        ax.set_ylabel('TPR', fontsize=14)
+        ax.set_xlabel('FPR', fontsize=14)
+    ax.legend(loc='lower right', fontsize=12)
+    ax.set_title(key, fontsize=16)
     return ax
-
 
 
 
@@ -621,7 +637,7 @@ def annotate_heatmap(data, data_fmt, ax, cmap='Blues', high_best=True, annotate_
             ax.text(j + 0.5, i + 0.5, str_value, ha="center", va="center", color=text_color, **text_kwargs)
 
 
-def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best=True, figsize=(10, 3), save_folder=None, top_n_bold=2, annotate_row_wise=True, ysize=14):
+def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best=True, figsize=(10, 3), save_folder=None, top_n_bold=2, bottom_n_bold=0, annotate_row_wise=True, ysize=14):
 
     # round data
     data = data.round(round_to)
@@ -639,6 +655,8 @@ def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best
     # format, top_n_bold is the number of top rows to be bold (y labels)
     for i in range(top_n_bold):
         ax.yaxis.get_major_ticks()[-(i+1)].label1.set_fontweight('bold')
+    for i in range(bottom_n_bold):
+        ax.yaxis.get_major_ticks()[i].label1.set_fontweight('bold')
     #ax.yaxis.get_major_ticks()[-2].label1.set_fontweight('bold')
     plt.gca().invert_yaxis()
     plt.gca().xaxis.set_ticks_position('top')
@@ -651,7 +669,7 @@ def visualize_metric_matrix(metric, data, cmap, round_to, suffix=None, high_best
     if save_folder == None:
         plt.show()
     else:
-        plt.savefig(save_folder / f'metric_{metric}.png', dpi=150)
+        plt.savefig(save_folder / f'metric_{metric}.png', dpi=200)
         plt.close()
 
 

@@ -30,6 +30,24 @@ from fault_management_uds.config import rain_gauge_color, condition_to_meta
 
 
 
+def visualize_roc_auc(ax, i, key, fpr, tpr, roc_auc, optimal_fpr=None, optimal_tpr=None):   
+    ax.plot(fpr, tpr, color='darkorange', lw=2, label="ROC")#, label='AUC: %0.2f' % roc_auc)
+    ax.plot([0, 1], [0, 1], color='grey', lw=1, linestyle='--', label='Random')
+    # plot optimal if specified
+    if optimal_fpr is not None and optimal_tpr is not None:
+        ax.plot(optimal_fpr, optimal_tpr, marker='o', markersize=4, color='navy', label='Threshold')
+
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    if i == 0:
+        ax.set_ylabel('TPR', fontsize=14)
+        ax.set_xlabel('FPR', fontsize=14)
+    ax.legend(loc='lower right', fontsize=12)
+    ax.set_title(key, fontsize=16)
+    return ax
+
+
+
 def main(model_save_path, data_type):
 
 
@@ -64,6 +82,34 @@ def main(model_save_path, data_type):
     # set save folder
     save_folder = eval_folder / 'anomaly_detection'
     os.makedirs(save_folder, exist_ok=True)
+
+
+    # save the optimal thresholds
+    optimal_thresholds = {}
+    for key in methods:
+        optimal_thresholds[key] = results[key]['Optimal Threshold']
+
+    # Save the threshold values in LaTeX table format with better styling
+    with open(save_folder / 'optimal_thresholds.tex', 'w') as f:
+        f.write('\\begin{table}[H]\n')
+        f.write('\\centering\n')
+        f.write('\\renewcommand{\\arraystretch}{1.4} % Increase row height\n')
+        f.write('\\setlength{\\tabcolsep}{10pt} % Adjust column spacing\n')
+        f.write('\\begin{tabular}{ l c }\n')  # Left-align method names, center-align thresholds
+        f.write('\\toprule\n')
+        f.write('\\textbf{Model} & \\textbf{Optimal Threshold} \\\\\n')
+        f.write('\\midrule\n')
+
+        for key in methods:
+            f.write(f'{key} & {np.round(optimal_thresholds[key],3)} \\\\\n')
+
+        f.write('\\bottomrule\n')
+        f.write('\\end{tabular}\n')
+        f.write('\\caption{Optimal thresholds for the different models.}\n')
+        f.write('\\label{tab:optimal_thresholds}\n')
+        f.write('\\end{table}\n')
+
+
 
 
     # # # Thresholding
@@ -167,27 +213,33 @@ def main(model_save_path, data_type):
     # # ROC Curve
 
 
-    def visualize_roc_auc(ax, i, key, fpr, tpr, roc_auc, optimal_fpr=None, optimal_tpr=None):   
-        ax.plot(fpr, tpr, color='darkorange', lw=2, label="ROC")#, label='AUC: %0.2f' % roc_auc)
-        ax.plot([0, 1], [0, 1], color='grey', lw=1, linestyle='--', label='Random')
-        # plot optimal if specified
-        if optimal_fpr is not None and optimal_tpr is not None:
-            ax.plot(optimal_fpr, optimal_tpr, marker='o', markersize=4, color='navy', label='Threshold')
+    # # Visualize the results
+    # # Overall results
+    # fig, axes = plt.subplots(1, len(methods), figsize=(15, 3))
+    # auc_scores = {}
+    # for i, key in enumerate(methods):
+    #     # ROC curve
+    #     fpr, tpr, thresholds = roc_curve(results['Actual'], results[key]['Decision Function'])
+    #     roc_auc = auc(fpr, tpr)
+    #     auc_scores[key] = {'Overall': roc_auc}
+    #     # Find the index based on the optimal threshold
+    #     optimal_threshold = results[key]['Optimal Threshold']
+    #     optimal_index = np.argmin(np.abs(thresholds - optimal_threshold)) # Find the index of the optimal threshold based on smallest difference
+    #     optimal_fpr = fpr[optimal_index]
+    #     optimal_tpr = tpr[optimal_index]
+    #     axes[i] = visualize_roc_auc(axes[i], i, key, fpr, tpr, roc_auc, optimal_fpr, optimal_tpr)
+    #     # remove legend
+    #     if i != 0:
+    #         axes[i].legend().remove()
+    # plt.tight_layout()
+    # plt.savefig(save_folder / 'roc_auc_overall.png')
+    # #plt.show()
+    # plt.close()
 
-        ax.set_xlim([0.0, 1.0])
-        ax.set_ylim([0.0, 1.05])
-        if i == 0:
-            ax.set_ylabel('TPR', fontsize=12)
-            ax.set_xlabel('FPR', fontsize=12)
-        ax.legend(loc='lower right')
-        ax.set_title(key, fontsize=14)
-        return ax
 
+    fig, axes = plt.subplots(2, 3, figsize=(13, 6))  # Adjust height for 2 rows
+    axes = axes.flatten()  # Flatten the 2D array of axes for easy iteration
 
-
-    # Visualize the results
-    # Overall results
-    fig, axes = plt.subplots(1, len(methods), figsize=(15, 3))
     auc_scores = {}
     for i, key in enumerate(methods):
         # ROC curve
@@ -204,11 +256,93 @@ def main(model_save_path, data_type):
         if i != 0:
             axes[i].legend().remove()
     plt.tight_layout()
-    plt.savefig(save_folder / 'roc_auc_overall.png')
-    #plt.show()
+    plt.savefig(save_folder / 'roc_auc_overall.png', dpi=200)
+    plt.show()
     plt.close()
 
 
+    fig, axes = plt.subplots(2, 3, figsize=(13, 6))  # Adjust height for 2 rows
+    axes = axes.flatten()  # Flatten the 2D array of axes for easy iteration
+
+    method = "Multi-Feature"
+
+    data_label = results['Data Label']
+    for i, label in enumerate(["Overall"]+data_label_hue_order[::-1][:-1]):
+        if label == 'Overall':
+            # use all the data
+            mask = np.ones(len(data_label), dtype=bool)
+            # set the label to bold
+        else:
+            # For each anomaly
+            mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
+        # ROC curve
+        # check if any tp
+        if sum(results['Actual'][mask]) == 0:
+            print(f'No TP for {label} in {method}')
+            auc_scores[method][label] = 0  
+            continue
+        else:
+            fpr, tpr, thresholds = roc_curve(results['Actual'][mask], results[method]['Decision Function'][mask])
+            roc_auc = auc(fpr, tpr)
+            auc_scores[method][label] = roc_auc
+            
+        # Find the index based on the optimal threshold
+        optimal_threshold = results[method]['Optimal Threshold']
+        optimal_index = np.argmin(np.abs(thresholds - optimal_threshold)) # Find the index of the optimal threshold based on smallest difference
+        optimal_fpr = fpr[optimal_index]
+        optimal_tpr = tpr[optimal_index]
+        axes[i] = visualize_roc_auc(axes[i], i, label, fpr, tpr, roc_auc, optimal_fpr, optimal_tpr)
+        if label == 'Overall':
+            axes[i].set_title(f'{label}', fontweight='bold', fontsize=16)
+        # remove legend
+        if i != 0:
+            axes[i].legend().remove()
+        
+    plt.tight_layout()
+    plt.savefig(save_folder / f'roc_auc_{method}.png', dpi=200)
+    plt.show()
+    plt.close()
+
+
+
+
+
+    # # For each anomaly
+    # data_label = results['Data Label']
+    # for label in data_label_hue_order[::-1]:
+    #     if label == 'Original':
+    #         continue
+    #     mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
+        
+    #     fig, axes = plt.subplots(1, len(methods), figsize=(15, 3)) # plot
+
+    #     for i, key in enumerate(methods):
+    #         # ROC curve
+    #         # check if any tp
+    #         if sum(results['Actual'][mask]) == 0:
+    #             print(f'No TP for {label} in {key}')
+    #             auc_scores[key][label] = 0  
+    #             continue
+    #         else:
+    #             fpr, tpr, thresholds = roc_curve(results['Actual'][mask], results[key]['Decision Function'][mask])
+    #             roc_auc = auc(fpr, tpr)
+    #             auc_scores[key][label] = roc_auc
+                
+    #         # Find the index based on the optimal threshold
+    #         optimal_threshold = results[key]['Optimal Threshold']
+    #         optimal_index = np.argmin(np.abs(thresholds - optimal_threshold)) # Find the index of the optimal threshold based on smallest difference
+    #         optimal_fpr = fpr[optimal_index]
+    #         optimal_tpr = tpr[optimal_index]
+    #         axes[i] = visualize_roc_auc(axes[i], i, key, fpr, tpr, roc_auc, optimal_fpr, optimal_tpr)
+    #         # remove legend
+    #         if i != 0:
+    #             axes[i].legend().remove()
+    #     plt.tight_layout()
+    #     plt.savefig(save_folder / f'roc_auc_{label}.png')
+    #     #plt.show()
+    #     plt.close()
+
+    
 
     # For each anomaly
     data_label = results['Data Label']
@@ -217,7 +351,11 @@ def main(model_save_path, data_type):
             continue
         mask = (np.array(data_label) == label) | (np.array(data_label) == 'Original')
         
-        fig, axes = plt.subplots(1, len(methods), figsize=(15, 3)) # plot
+        #fig, axes = plt.subplots(1, len(methods), figsize=(15, 3)) # plot
+
+        fig, axes = plt.subplots(2, 3, figsize=(13, 6))  # Adjust height for 2 rows
+        axes = axes.flatten()  # Flatten the 2D array of axes for easy iteration
+
 
         for i, key in enumerate(methods):
             # ROC curve
@@ -241,9 +379,16 @@ def main(model_save_path, data_type):
             if i != 0:
                 axes[i].legend().remove()
         plt.tight_layout()
-        plt.savefig(save_folder / f'roc_auc_{label}.png')
+        plt.savefig(save_folder / f'roc_auc_{label}.png', dpi=200)
         #plt.show()
         plt.close()
+
+    
+
+
+
+
+
 
     
     # # AUC metric
@@ -261,7 +406,19 @@ def main(model_save_path, data_type):
     visualize_metric_matrix('AUC', metric_df, 'Oranges', 2, suffix=None, figsize=(9, 3), save_folder=None)
 
 
-    
+
+    # row ordering
+    row_order = ['Average'] + data_label_hue_order[1:] + ['Overall']
+
+    # AUC
+    metric_df = pd.DataFrame(auc_scores)
+    # Calculate the average AUC as well
+    metric_df.loc['Average'] = metric_df.loc[data_label_hue_order[1:]].mean()
+    metric_df = metric_df.loc[row_order]
+    visualize_metric_matrix('AUC_v2', metric_df, 'Oranges', 2, top_n_bold=1, bottom_n_bold=1, suffix=None, figsize=(9, 3), save_folder=save_folder)
+    visualize_metric_matrix('AUC_v2', metric_df, 'Oranges', 2, top_n_bold=1, bottom_n_bold=1, suffix=None, figsize=(9, 3), save_folder=None)
+
+        
     # # Decision Function
 
 
@@ -320,6 +477,67 @@ def main(model_save_path, data_type):
     plt.show()
     plt.close()
 
+
+
+
+    fig, axes = plt.subplots(2, 3, figsize=(13, 6))#, sharex=True)  # Adjust height for 2 rows
+    axes = axes.flatten()  # Flatten the 2D array of axes for easy iteration
+
+
+    method = "Multi-Feature"
+    normal_data = results[method]['Decision Function']#[_normal_data]
+    axes[0].hist(normal_data, bins=200, color='mediumpurple', 
+                 alpha=1)#, edgecolor='white')
+    threshold = results[method]['Optimal Threshold']
+    axes[0].axvline(threshold, color='black', linestyle='--', label=f'Threshold: {threshold:.3f}')
+    axes[0].set_title("Overall", fontsize=14, fontweight='bold')
+    axes[0].set_xticks([])
+
+    axes[0].legend(loc='upper right', fontsize=16)
+
+    axes[0].set_ylabel('Count', fontsize=16)
+    axes[3].set_ylabel('Count', fontsize=16)
+
+
+
+    # For each anomaly
+    data_label = results['Data Label']
+    for i, label in enumerate(data_label_hue_order[::-1][:-1]):
+        mask = (np.array(data_label) == label) #| (np.array(data_label) == 'Original')
+        
+        # visualize the decision function
+        normal_data = results[method]['Decision Function'][mask]
+        axes[i+1].hist(normal_data, bins=200, color='mediumpurple', 
+                       alpha=1)
+        axes[i+1].axvline(threshold, color='black', linestyle='--', label='Threshold')
+        axes[i+1].set_title(label, fontsize=16)
+        if i+1 > 2:
+            axes[i+1].set_xlabel('Anomaly Scores', fontsize=16)
+        else:
+            # remove x ticks
+            axes[i+1].set_xticks([])
+    
+    # set the x limit based on the decision function
+    normal_data = results[method]['Decision Function']#[_normal_data]
+    x_min = min(normal_data.min(), threshold) - 0.01
+    x_max = max(normal_data.max(), threshold) + 0.01
+    for ax in axes:
+        ax.set_xlim(x_min, x_max)
+
+    fig.align_ylabels()  # ensures all y-labels are properly aligned
+    plt.tight_layout()
+    plt.savefig(save_folder / f'decision_function_{method}_anomalies.png')
+    plt.show()
+    plt.close()
+
+
+
+
+
+
+
+
+
     
     # # Timing and Coverage
 
@@ -371,12 +589,20 @@ def main(model_save_path, data_type):
                 #     timing.append(np.inf)  # Use inf to indicate no proximity
             elif direction == 'end':
                 # Filter indices that are before the end
-                end_threshold = end + 60 # 60 minutes after the end
+                end_threshold = end  + (end - start)  #+ 60 # 60 minutes after the end
                 valid_indices = ones_indices[(ones_indices >= start) & (ones_indices < end_threshold)]
                 if valid_indices.size > 0:
                     distances = np.abs(valid_indices - end)
-                    closest_index = valid_indices[np.argmin(distances)]
-                    timing.append(closest_index - end)
+                    
+                    # if distance is more then 60 minutes, use that instead
+                    if np.min(distances) > end_threshold - end:
+                        timing.append(end_threshold - end)
+                    else:
+                        closest_index = valid_indices[np.argmin(distances)]
+                        timing.append(closest_index - end)
+                        
+                    # closest_index = valid_indices[np.argmin(distances)]
+                    # timing.append(closest_index - end)
                 # else:
                 #     timing.append(np.inf)  # Use inf to indicate no proximity
             else:
@@ -443,6 +669,7 @@ def main(model_save_path, data_type):
     method = "Multi-Feature"
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 3))#, sharey=True)
+
     coverage = get_coverage(results[method]['Predicted'], anomaly_start_end)
     # for timing, we only want those that are detected
     _anomaly_start_end = [anomaly_start_end[i] for i, cov in enumerate(coverage) if cov > 0]
@@ -462,63 +689,75 @@ def main(model_save_path, data_type):
     axes[1].hist(start_timing, bins=40, color='green', alpha=0.5, edgecolor='white')
     axes[2].hist(end_timing, bins=40, color='red', alpha=0.5, edgecolor='white')
     #axes[0].set_title(method, fontsize=14)
-
-    # Adding vertical line at x = 0
-    axes[0].axvline(x=1, color='grey', linestyle='--', linewidth=1.2, label='Perfect Coverage')
-    axes[1].axvline(x=0, color='grey', linestyle='--', linewidth=1.2, label='Perfect Timing')
-    axes[2].axvline(x=0, color='grey', linestyle='--', linewidth=1.2, label='Perfect Timing')
-
-    # Set titles
-    axes[0].set_title('Coverage', fontsize=15)
-    axes[1].set_title('Start Timing', fontsize=15)
-    axes[2].set_title('End Timing', fontsize=15)
-
-    plt.tight_layout()
-    plt.savefig(save_folder / f'coverage_timing_{method}.png')
-    plt.show()
-    plt.close()
-
-
-
-
-    fig, axes = plt.subplots(1, 3, figsize=(15, 3))#, sharey=True)
-    coverage = get_coverage(results[method]['Predicted'], anomaly_start_end)
-    # for timing, we only want those that are detected
-    _anomaly_start_end = [anomaly_start_end[i] for i, cov in enumerate(coverage) if cov > 0]
-    start_timing = get_timing(results[method]['Predicted'], _anomaly_start_end, direction='start')
-    end_timing = get_timing(results[method]['Predicted'], _anomaly_start_end, direction='end')
-    # filter coverage as well
-    coverage = [cov for cov in coverage if cov > 0]
-
-    # Store the results
-    coverage_scores[method] = {'Overall': np.mean(coverage) if len(coverage) > 0 else 0}
-    timing_start_scores[method] = {'Overall': np.mean(start_timing) if len(start_timing) > 0 else 0}
-    timing_end_scores[method] = {'Overall': np.mean(end_timing) if len(end_timing) > 0 else 0}
-
-
-    # Visualize the distribution of the decision function
-    axes[0].hist(coverage, bins=40, color='blue', alpha=0.5, edgecolor='white')
-    axes[1].hist(start_timing, bins=40, color='green', alpha=0.5, edgecolor='white')
-    axes[2].hist(end_timing, bins=40, color='red', alpha=0.5, edgecolor='white')
     # Set y-axis to log scale
     axes[0].set_yscale("log")
     axes[1].set_yscale("log")
     axes[2].set_yscale("log")
-    
+
     # Adding vertical line at x = 0
     axes[0].axvline(x=1, color='grey', linestyle='--', linewidth=1.2, label='Perfect Coverage')
     axes[1].axvline(x=0, color='grey', linestyle='--', linewidth=1.2, label='Perfect Timing')
     axes[2].axvline(x=0, color='grey', linestyle='--', linewidth=1.2, label='Perfect Timing')
 
     # Set titles
-    axes[0].set_title('Coverage', fontsize=15)
-    axes[1].set_title('Start Timing', fontsize=15)
-    axes[2].set_title('End Timing', fontsize=15)
+    axes[0].set_title('Coverage', fontsize=18)
+    axes[1].set_title('Start Timing', fontsize=18)
+    axes[2].set_title('End Timing', fontsize=18)
+
+    # set x label
+    axes[0].set_ylabel('Log Scale', fontsize=16)
+
+    # increase x and y ticks size
+    for ax in axes:
+        ax.tick_params(axis='both', which='major', labelsize=14)
 
     plt.tight_layout()
     plt.savefig(save_folder / f'coverage_timing_log_{method}.png')
     plt.show()
     plt.close()
+
+
+
+
+
+    # fig, axes = plt.subplots(1, 3, figsize=(15, 3))#, sharey=True)
+    # coverage = get_coverage(results[method]['Predicted'], anomaly_start_end)
+    # # for timing, we only want those that are detected
+    # _anomaly_start_end = [anomaly_start_end[i] for i, cov in enumerate(coverage) if cov > 0]
+    # start_timing = get_timing(results[method]['Predicted'], _anomaly_start_end, direction='start')
+    # end_timing = get_timing(results[method]['Predicted'], _anomaly_start_end, direction='end')
+    # # filter coverage as well
+    # coverage = [cov for cov in coverage if cov > 0]
+
+    # # Store the results
+    # coverage_scores[method] = {'Overall': np.mean(coverage) if len(coverage) > 0 else 0}
+    # timing_start_scores[method] = {'Overall': np.mean(start_timing) if len(start_timing) > 0 else 0}
+    # timing_end_scores[method] = {'Overall': np.mean(end_timing) if len(end_timing) > 0 else 0}
+
+
+    # # Visualize the distribution of the decision function
+    # axes[0].hist(coverage, bins=40, color='blue', alpha=0.5, edgecolor='white')
+    # axes[1].hist(start_timing, bins=40, color='green', alpha=0.5, edgecolor='white')
+    # axes[2].hist(end_timing, bins=40, color='red', alpha=0.5, edgecolor='white')
+    # # Set y-axis to log scale
+    # axes[0].set_yscale("log")
+    # axes[1].set_yscale("log")
+    # axes[2].set_yscale("log")
+    
+    # # Adding vertical line at x = 0
+    # axes[0].axvline(x=1, color='grey', linestyle='--', linewidth=1.2, label='Perfect Coverage')
+    # axes[1].axvline(x=0, color='grey', linestyle='--', linewidth=1.2, label='Perfect Timing')
+    # axes[2].axvline(x=0, color='grey', linestyle='--', linewidth=1.2, label='Perfect Timing')
+
+    # # Set titles
+    # axes[0].set_title('Coverage', fontsize=15)
+    # axes[1].set_title('Start Timing', fontsize=15)
+    # axes[2].set_title('End Timing', fontsize=15)
+
+    # plt.tight_layout()
+    # plt.savefig(save_folder / f'coverage_timing_log_{method}.png')
+    # plt.show()
+    # plt.close()
 
 
 
@@ -746,14 +985,14 @@ def main(model_save_path, data_type):
         # Store the results
         intervals_count[key] = {
             'Total Predicted Intervals': total_predicted_intervals,
-            'Total Intervals without Coverage': total_intervals_without_coverage,
-            'Total Intervals with Coverage': total_intervals_with_coverage,
+            'Intervals without true-positives': total_intervals_without_coverage,
+            'Intervals with true-positives': total_intervals_with_coverage,
 
         }
         intervals_sizes[key] = {
             'Predicted Intervals Sizes': [end - start + 1 for start, end in predicted_start_end],
-            'No Coverage Intervals Sizes': [end - start + 1 for start, end in predicted_start_end if (start, end) not in predicted_and_actual_start_end],
-            'Coverage Intervals Sizes': [end - start + 1 for start, end in predicted_and_actual_start_end],
+            'Intervals Sizes without TP': [end - start + 1 for start, end in predicted_start_end if (start, end) not in predicted_and_actual_start_end],
+            'Intervals Sizes with TP': [end - start + 1 for start, end in predicted_and_actual_start_end],
         }
 
         intervals_decisions[key] = {
@@ -796,14 +1035,70 @@ def main(model_save_path, data_type):
     plt.close()
 
 
+
+    # Convert data to a DataFrame for easy visualization
+    df = pd.DataFrame.from_dict(intervals_count, orient="index").reset_index()
+    df = df.melt(id_vars="index", var_name="Category", value_name="Count")
+    df.rename(columns={"index": "Method"}, inplace=True)
+
+    custom_palette = ["cornflowerblue", "red", "green"]
+
+    # Plot
+    plt.figure(figsize=(15, 5))
+    ax = sns.barplot(data=df, x="Method", y="Count", hue="Category", palette=custom_palette, alpha=0.7)
+
+    # Add count labels on top of bars
+    # Assume the first container is the baseline (100%)
+    baseline_value = ax.containers[0].datavalues  # First container value
+
+    for container in ax.containers:
+        values = np.array(container.datavalues)
+        # Replace NaN values with 0
+        values = np.nan_to_num(values)
+        
+        # Check for division by zero
+        with np.errstate(divide='ignore', invalid='ignore'):
+            labels = values / baseline_value
+        
+        # Replace NaN or infinite values with 0
+        labels = np.nan_to_num(labels)
+        
+        # Format as percentage
+        labels = [f"{v:.1%}" if v > 0 else "" for v in labels]
+        
+        # Add bar labels only where values are non-zero
+        ax.bar_label(container, labels=labels, label_type="edge", fontsize=11, padding=3)
+
+    # increase font size for x-axis
+    plt.xticks(fontsize=16)
+
+
+    # Labels and title
+    plt.ylabel("Total Count", fontsize=16)
+    plt.xlabel(" ", fontsize=12)
+
+    plt.legend(title=None, loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=14)
+    #plt.grid(axis="x", linestyle="--", alpha=0.6)
+
+    # remove spines on top and right
+    sns.despine()
+
+    plt.tight_layout()
+    plt.savefig(save_folder / 'intervals_count_v2.png')
+    plt.show()
+    plt.close()
+
+
+
+
     fig, axes = plt.subplots(3, len(methods), figsize=(16, 5), sharex="col")
 
     for i, key in enumerate(methods):
         axes[0, i].hist(intervals_sizes[key]['Predicted Intervals Sizes'],
                         bins=40, color='cornflowerblue', alpha=0.5)
-        axes[1, i].hist(intervals_sizes[key]['Coverage Intervals Sizes'], 
+        axes[1, i].hist(intervals_sizes[key]['Intervals Sizes with TP'], 
                         bins=40, color='green', alpha=0.5)
-        axes[2, i].hist(intervals_sizes[key]['No Coverage Intervals Sizes'],
+        axes[2, i].hist(intervals_sizes[key]['Intervals Sizes without TP'],
                         bins=40, color='red', alpha=0.5)
         axes[0, i].set_title(key, fontsize=14)
         
@@ -829,6 +1124,10 @@ def main(model_save_path, data_type):
     plt.savefig(save_folder / 'interval_sizes.png')
     plt.show()
     plt.close()
+
+
+
+
 
 
     # create df based on intervals_count[method]
@@ -866,48 +1165,82 @@ def main(model_save_path, data_type):
 
     method = "Multi-Feature"
 
+    for method in methods:
+
+        # # plot the 
+        # successes = [1] * len(intervals_decisions[method]['Coverage Decisions']) + [0] * len(intervals_decisions[method]['No Coverage Decisions'])
+        # decisions = intervals_decisions[method]['Coverage Decisions'] + intervals_decisions[method]['No Coverage Decisions']
+        # sizes = intervals_sizes[method]['Intervals Sizes with TP'] + intervals_sizes[method]['Intervals Sizes without TP']
+
+        # # Sort decisions and sizes by decision values in descending order
+        # sorted_indices = np.argsort(sizes)[::-1]
+        # sorted_decisions = np.array(decisions)[sorted_indices]
+        # sorted_sizes = np.array(sizes)[sorted_indices]
+        # sorted_successes = np.array(successes)[sorted_indices]
+
+        # # Define colors based on successes
+        # colors = ['green' if success == 1 else 'lightcoral' for success in sorted_successes]
+
+        # Create lists
+        successes = [1] * len(intervals_decisions[method]['Coverage Decisions']) + [0] * len(intervals_decisions[method]['No Coverage Decisions'])
+        decisions = intervals_decisions[method]['Coverage Decisions'] + intervals_decisions[method]['No Coverage Decisions']
+        sizes = intervals_sizes[method]['Intervals Sizes with TP'] + intervals_sizes[method]['Intervals Sizes without TP']
+
+        # Sort first by size (ascending), then by decision (ascending)
+        sorted_indices = np.lexsort((decisions, sizes))  # sizes first, then decisions
+
+        sorted_decisions = np.array(decisions)[sorted_indices]
+        sorted_sizes = np.array(sizes)[sorted_indices]
+        sorted_successes = np.array(successes)[sorted_indices]
+
+        # Define colors based on successes
+        colors = ['green' if success == 1 else 'lightcoral' for success in sorted_successes]
+
+
+        # Plot
+        #plt.figure(figsize=(16, 5))
+        fig, ax = plt.subplots(figsize=(16, 5))
+        plt.bar(np.arange(len(sorted_sizes)), sorted_decisions, color=colors, alpha=0.7, width=1.0)
+
+        # set meaningful x ticks, every 10% of the data, and show size
+        xticks = np.linspace(0, len(sorted_sizes) - 1, 11)  # Avoid out-of-bounds index
+        xticks = np.round(xticks).astype(int)  # Convert to valid indices
+        xticklabels = [sorted_sizes[i] for i in xticks]  # Get corresponding values
+        plt.xticks(xticks, xticklabels, fontsize=16)
+
+        # increase font size for y-axis
+        plt.yticks(fontsize=16)
+
+        # set y limits based on the decision values
+        plt.ylim(min(sorted_decisions), max(sorted_decisions))
+
+        plt.xlim(-1, len(sorted_sizes))
+        plt.xlabel("Sorted Interval Sizes", fontsize=20)
+        plt.ylabel("Anomaly Scores", fontsize=20)
+
+        # create a legend using empty scatter plot
+        plt.scatter([], [], color='green', label='Intervals with true-positives')
+        plt.scatter([], [], color='lightcoral', label='Intervals without true-positives')
+        # place legend flattened at the bottom
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=4, fontsize=18)
+
+
+
+        #plt.legend(loc='upper right', fontsize=16)
+        #plt.title("Decisions as a Function of Sizes")
+        plt.tight_layout()
+        plt.savefig(save_folder / f'decisions_sizes_{method}.png', dpi=300)
+        plt.show()
+        plt.close()
+
+
+
+    method = "Multi-Feature"
+
     # plot the 
     successes = [1] * len(intervals_decisions[method]['Coverage Decisions']) + [0] * len(intervals_decisions[method]['No Coverage Decisions'])
     decisions = intervals_decisions[method]['Coverage Decisions'] + intervals_decisions[method]['No Coverage Decisions']
-    sizes = intervals_sizes[method]['Coverage Intervals Sizes'] + intervals_sizes[method]['No Coverage Intervals Sizes']
-
-    # Sort decisions and sizes by decision values in descending order
-    sorted_indices = np.argsort(sizes)[::-1]
-    sorted_decisions = np.array(decisions)[sorted_indices]
-    sorted_sizes = np.array(sizes)[sorted_indices]
-    sorted_successes = np.array(successes)[sorted_indices]
-
-    # Define colors based on successes
-    colors = ['green' if success == 1 else 'lightcoral' for success in sorted_successes]
-
-
-    # Plot
-    plt.figure(figsize=(16, 5))
-    plt.bar(np.arange(len(sorted_sizes)), sorted_decisions, color=colors, alpha=0.7, width=1.0)
-    # show optimal threshold
-    plt.axhline(results[method]['Optimal Threshold'], color='black', linestyle='--', label='Threshold')
-
-    # set meaningful x ticks, every 10% of the data, and show size
-    xticks = np.linspace(0, len(sorted_sizes) - 1, 11)  # Avoid out-of-bounds index
-    xticks = np.round(xticks).astype(int)  # Convert to valid indices
-    xticklabels = [sorted_sizes[i] for i in xticks]  # Get corresponding values
-    plt.xticks(xticks, xticklabels, fontsize=12)
-
-    plt.xlim(-1, len(sorted_sizes))
-    plt.xlabel("Sorted Interval Sizes", fontsize=18)
-    plt.ylabel("Decision Values", fontsize=18)
-    plt.legend(loc='upper right', fontsize=14)
-    #plt.title("Decisions as a Function of Sizes")
-    plt.tight_layout()
-    plt.savefig(save_folder / f'decisions_sizes_{method}.png', dpi=200)
-    plt.show()
-    plt.close()
-
-
-    # plot the 
-    successes = [1] * len(intervals_decisions[method]['Coverage Decisions']) + [0] * len(intervals_decisions[method]['No Coverage Decisions'])
-    decisions = intervals_decisions[method]['Coverage Decisions'] + intervals_decisions[method]['No Coverage Decisions']
-    sizes = intervals_sizes[method]['Coverage Intervals Sizes'] + intervals_sizes[method]['No Coverage Intervals Sizes']
+    sizes = intervals_sizes[method]['Intervals Sizes with TP'] + intervals_sizes[method]['Intervals Sizes without TP']
 
     # Sort decisions and sizes by decision values in descending order
     sorted_indices = np.argsort(decisions)[::-1]
@@ -931,25 +1264,30 @@ def main(model_save_path, data_type):
     xticks = np.linspace(0, len(sorted_decisions) - 1, 11)  # Avoid out-of-bounds index
     xticks = np.round(xticks).astype(int)  # Convert to valid indices
     xticklabels = [np.round(sorted_decisions[i], 3) for i in xticks]  # Get corresponding values
-    plt.xticks(xticks, xticklabels, fontsize=12)
+    plt.xticks(xticks, xticklabels, fontsize=16)
+
+    # increase font size for y-axis
+    plt.yticks(fontsize=16)
+
+    # set y limits based on the sizes
+    plt.ylim(min(sorted_sizes), max(sorted_sizes))
 
     plt.xlim(-1, len(sorted_decisions))
-    plt.ylabel("Interval Sizes", fontsize=18)
-    plt.xlabel("Decision Values", fontsize=18)
+    plt.ylabel("Interval Sizes", fontsize=20)
+    plt.xlabel("Decision Values", fontsize=20)
     #plt.title("Decisions as a Function of Sizes")
     plt.tight_layout()
-    plt.savefig(save_folder / f'sizes_decisions_{method}.png', dpi=200)
+    plt.savefig(save_folder / f'sizes_decisions_{method}.png', dpi=300)
     plt.show()
     plt.close()
 
 
 
-
     successful_desc = intervals_decisions[method]['Coverage Decisions']
-    successful_sizes = intervals_sizes[method]['Coverage Intervals Sizes']
+    successful_sizes = intervals_sizes[method]['Intervals Sizes with TP']
 
     unsuccessful_desc = intervals_decisions[method]['No Coverage Decisions']
-    unsuccessful_sizes = intervals_sizes[method]['No Coverage Intervals Sizes']
+    unsuccessful_sizes = intervals_sizes[method]['Intervals Sizes without TP']
 
 
     # plot scatter of unsuccessful then successful
@@ -970,10 +1308,10 @@ def main(model_save_path, data_type):
 
 
     successful_desc = intervals_decisions[method]['Coverage Decisions']
-    successful_sizes = intervals_sizes[method]['Coverage Intervals Sizes']
+    successful_sizes = intervals_sizes[method]['Intervals Sizes with TP']
 
     unsuccessful_desc = intervals_decisions[method]['No Coverage Decisions']
-    unsuccessful_sizes = intervals_sizes[method]['No Coverage Intervals Sizes']
+    unsuccessful_sizes = intervals_sizes[method]['Intervals Sizes without TP']
 
 
     # plot scatter of unsuccessful then successful
@@ -1095,21 +1433,16 @@ def main(model_save_path, data_type):
 
 
     method = "Multi-Feature"
-
-
     fig, axes = plt.subplots(2, 3, figsize=(12, 4), sharey=True)
-
     axes = axes.flatten()
-
     formatter = ticker.FuncFormatter(lambda x, _: f'{x:.3}')
-
     n_bins = 10
     normalized_x = np.linspace(0, 1, n_bins)  # Create normalized positions
 
     # Visualize the binned_decision_values[method]
-    for j, label in enumerate(data_label_hue_order[::-1]):
-        if label == 'Original':
-            label = "Overall"
+    for j, label in enumerate(['Overall'] + data_label_hue_order[::-1][:-1]):
+        if label == 'Overall':
+            #label = "Overall"
             color = 'black'
         else:
             # Anomaly filter
@@ -1135,13 +1468,17 @@ def main(model_save_path, data_type):
         axes[j].set_xticks([])
         fontweight = 'bold' if label == 'Overall' else 'normal' 
         #axes[j].set_ylabel(label, fontsize=12, rotation=0, labelpad=10, ha='right', fontweight=fontweight)
-        axes[j].set_title(label, fontsize=14, fontweight=fontweight)
+        axes[j].set_title(label, fontsize=16, fontweight=fontweight)
         axes[j].yaxis.set_major_formatter(formatter)
 
     # for last three, set xticks
     for j in range(3):
         axes[j+3].set_xticks([0, 0.5, 1])
+        axes[j+3].set_xlabel('Normalized Time', fontsize=12)
 
+    # set y label
+    axes[0].set_ylabel('Anomaly Scores', fontsize=12)
+    axes[3].set_ylabel('Anomaly Scores', fontsize=12)
 
     # set legend at bottom flattened
     #axes[4].legend(loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2, fontsize=12)
@@ -1151,7 +1488,6 @@ def main(model_save_path, data_type):
     plt.savefig(save_folder / f'binned_anomaly_intervals_{method}.png', dpi=200)
     plt.show()
     plt.close()
-
 
 
 
@@ -1310,8 +1646,8 @@ def main(model_save_path, data_type):
             'Avg. Coverage Values': coverage_values[most_accurate],
             'Closest Stop Before Start': closest_stop_before_start[most_accurate],
             'Closest Stop After End': closest_stop_after_end[most_accurate],
-            'Start Time': results['Starttime'][start_end[most_accurate][0]],
-            'End Time': results['Starttime'][start_end[most_accurate][1]],
+            'Start Time': starttimes[start_end[most_accurate][0]],
+            'End Time': starttimes[start_end[most_accurate][1]],
             'Start Index': start_end[most_accurate][0],
             'End Index': start_end[most_accurate][1]
             # 'Start Time': anomaly_intervals[anomaly]["Starts"][most_accurate],
@@ -1324,8 +1660,8 @@ def main(model_save_path, data_type):
             'Avg. Coverage Values': coverage_values[least_accurate],
             'Closest Stop Before Start': closest_stop_before_start[least_accurate],
             'Closest Stop After End': closest_stop_after_end[least_accurate],
-            'Start Time': results['Starttime'][start_end[least_accurate][0]],
-            'End Time': results['Starttime'][start_end[least_accurate][1]],
+            'Start Time': starttimes[start_end[least_accurate][0]],
+            'End Time': starttimes[start_end[least_accurate][1]],
             'Start Index': start_end[least_accurate][0],
             'End Index': start_end[least_accurate][1]
             # 'Start Time': anomaly_intervals[anomaly]["Starts"][least_accurate],
@@ -1397,15 +1733,16 @@ def main(model_save_path, data_type):
         #most_certain_non_anomaly = np.argsort(decision_values)[-(top+1)]
         detections['Most Certain Non-Anomaly'][f'Top {top+1}'] = {
             'Avg. Decision Values': decision_values[most_certain_non_anomaly],
-            'Start Time': results['Starttime'][start_end[most_certain_non_anomaly][0]],
-            'End Time': results['Starttime'][start_end[most_certain_non_anomaly][1]],
+            'Start Time': starttimes[start_end[most_certain_non_anomaly][0]],
+            'End Time': starttimes[start_end[most_certain_non_anomaly][1]],
             'Start Index': start_end[most_certain_non_anomaly][0],
             'End Index': start_end[most_certain_non_anomaly][1]
         }
 
 
-
-
+    # Save the detections as a pickle file
+    with open(save_folder / 'detections.pkl', 'wb') as f:
+        pickle.dump(detections, f)
 
 
     # ### Difference vs. decision function plot
@@ -1413,7 +1750,7 @@ def main(model_save_path, data_type):
 
     from fault_management_uds.get_detection import load_model_outputs
     from fault_management_uds.data.dataset import load_data, load_dataframe_from_HDF5
-    from fault_management_uds.plots import visualize_error_span, set_meaningful_xticks
+    from fault_management_uds.plots import visualize_error_span#, set_meaningful_xticks
 
     from fault_management_uds.data.load import import_metadata
 
@@ -1447,6 +1784,14 @@ def main(model_save_path, data_type):
         for detection_type in detections[detection_theme].keys():
 
             try:
+
+                if detection_theme == 'Most Certain Non-Anomaly':
+                    ano_start_name = 'Start'
+                    ano_end_name = 'End'
+                else:
+                    ano_start_name = "True Start"
+                    ano_end_name = "True End"
+
                 # create a save folder
                 _save_folder = save_folder / detection_theme / detection_type
                 os.makedirs(_save_folder, exist_ok=True)
@@ -1574,8 +1919,6 @@ def main(model_save_path, data_type):
                 # import sys
                 # sys.exit(0)
 
-
-
                 def visualize_rain(ax, title, data_dict, marker='o', linewidth=1):
                     ax.set_title(title, fontsize=20)
                     ### Visualize rain data
@@ -1584,7 +1927,7 @@ def main(model_save_path, data_type):
                         label=f'Rain gauge {rain_gauge}', color='darkblue',
                         linewidth=linewidth, linestyle='-', 
                         marker=marker, markersize=1, alpha=1)
-                    ax.set_ylabel('Rain (mm)')
+                    ax.set_ylabel('Rain (mm)', fontsize=12)
                     ax.legend(loc='upper right')
                     ax.set_xticks([])
                     # set y limits based on 0 and max wrt both
@@ -1608,10 +1951,9 @@ def main(model_save_path, data_type):
                     # visualzie error span
                     #ax = visualize_error_span(ax, data_dict['indicator_dict'], data_dict['start'], data_dict['end'], adjust='full-point')
                     ax.set_xlim(data_dict['start'], data_dict['end'])
-                    ax.set_ylabel(unit)
+                    ax.set_ylabel(unit, fontsize=12)
                     ax.set_xticks([])
                     return ax
-
 
                 
                 # Plot the time series
@@ -1623,8 +1965,8 @@ def main(model_save_path, data_type):
                 axs[1] = visualize_injected_synthetics(axs[1], sensor_name, data_dict, unit)
 
                 # true start and stop
-                axs[1].axvline(starttime, color='green', linestyle='--', linewidth=1.2, label='True Start')
-                axs[1].axvline(endtime, color='red', linestyle='--', linewidth=1.2, label='True End')
+                axs[1].axvline(starttime, color='green', linestyle='--', linewidth=1.2, label=ano_start_name)
+                axs[1].axvline(endtime, color='red', linestyle='--', linewidth=1.2, label=ano_end_name)
 
                 axs[1].yaxis.set_major_formatter(formatter)
                 axs[-1] = set_meaningful_xticks(axs[-1], data_dict['start'], data_dict['end'])
@@ -1723,6 +2065,60 @@ def main(model_save_path, data_type):
 
 
 
+                fig, axs = plt.subplots(1, 1, figsize=(10, 3))
+
+                # Inside your plotting function/loop
+                formatter = ticker.FormatStrFormatter('%.0f')  # Change to the desired format, e.g., '%.3f' for three decimal places
+
+                # Extract from the model outputs
+                start_idx = np.where(starttimes == show_start)[0][0]
+                end_idx = np.where(starttimes == show_end)[0][0]
+                data = outputs[start_idx:end_idx+1, :]
+
+
+                axs = visualize_error_span(axs, indicator_dict, show_start, show_end, adjust='full-point')
+                # Extract the decision values
+                decision_values = results[method]['Decision Function'][start_idx:end_idx+1]
+                # Plot the decision function
+                axs.plot(show_timestamps, decision_values, color='indianred', label='Score')
+                # get the optimal threshold
+                threshold = results[method]["Optimal Threshold"]
+                axs.axhline(threshold, color='grey', linestyle='--', label='Threshold', linewidth=1.2)
+            
+
+                # true start and stop
+                axs.axvline(starttime, color='green', linestyle='--', linewidth=1.2, label=ano_start_name)
+                axs.axvline(endtime, color='red', linestyle='--', linewidth=1.2, label=ano_end_name)
+
+                # formatting
+                decision_values = np.insert(decision_values, 0, threshold) # add threshold as first element
+                min_max_diff_div = (max(decision_values) - min(decision_values)) / 10
+                axs.set_ylim(decision_values.min()-min_max_diff_div, decision_values.max()+min_max_diff_div)  # Ensure unique y-axis limits
+                #axs[i, 1].set_yticks([0])
+                #axs[i, 1].yaxis.set_major_formatter(formatter)
+                axs.set_xlim(show_start, show_end)
+                #axs.set_title('Anomaly Score', fontsize=14)
+                #axs[i+1].set_ylabel('Values', fontsize=12, rotation=0, labelpad=10, ha='right', va='center')
+                axs.legend(loc='upper right', fontsize=12)#, bbox_to_anchor=(1.25, 1))
+
+                # set y label
+                axs.set_ylabel('Anomaly Score', fontsize=12)
+
+                # remove xticks
+                axs = set_meaningful_xticks(axs, show_start, show_end)
+
+                plt.tight_layout()
+                plt.savefig(_save_folder / 'decision_time_series.png', dpi=150)
+                plt.show()
+                plt.close()
+
+
+
+
+
+
+
+
 
                 fig, axs = plt.subplots(len(methods)+1, 1, figsize=(10, 10))
 
@@ -1750,8 +2146,8 @@ def main(model_save_path, data_type):
                     axs[i].axhline(0, color='grey', linestyle='--', linewidth=1, label='Zero')
 
                     # Show true start and stop with hline
-                    axs[i].axvline(starttime, color='green', linestyle='--', linewidth=1.2, label='True Start')
-                    axs[i].axvline(endtime, color='red', linestyle='--', linewidth=1.2, label='True End')
+                    axs[i].axvline(starttime, color='green', linestyle='--', linewidth=1.2, label=ano_start_name)
+                    axs[i].axvline(endtime, color='red', linestyle='--', linewidth=1.2, label=ano_end_name)
 
 
                     # formatting
@@ -1846,8 +2242,8 @@ def main(model_save_path, data_type):
                 ax.axhline(0, color='grey', linestyle='--', linewidth=1, label='Zero')
                 # formatting
 
-                ax.axvline(starttime, color='green', linestyle='--', linewidth=1.2, label='True Start')
-                ax.axvline(endtime, color='red', linestyle='--', linewidth=1.2, label='True End')
+                ax.axvline(starttime, color='green', linestyle='--', linewidth=1.2, label=ano_start_name)
+                ax.axvline(endtime, color='red', linestyle='--', linewidth=1.2, label=ano_end_name)
 
                 #ax.set_ylabel('Residuals', fontsize=14, rotation=0, labelpad=10, ha='right', va='center')
                 # visualzie error span
@@ -1855,7 +2251,8 @@ def main(model_save_path, data_type):
                 ax.set_xlim(data_dict['start'], data_dict['end'])
                 #ax.set_ylabel(unit)
                 # place legend outside
-                ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1), fontsize=12)
+                ax.legend(loc='upper right', fontsize=12) # bbox_to_anchor=(1.02, 1)
+                ax.set_ylabel('Residuals', fontsize=12)
                 ax.set_xticks([])
                 ax.yaxis.set_major_formatter(formatter)
                 ax = set_meaningful_xticks(ax, data_dict['start'], data_dict['end'])
@@ -1942,6 +2339,8 @@ def main(model_save_path, data_type):
                     plt.show()
                     plt.close()
 
+                    return pca
+
 
 
                 # PCA
@@ -1954,17 +2353,45 @@ def main(model_save_path, data_type):
 
                 # Perform PCA analysis
                 method = "Final Hidden" # using only this method
-                pca_analysis(method, outputs, column_2_idx, results, show_start_idx, show_end_idx)
+                pca = pca_analysis(method, outputs, column_2_idx, results, show_start_idx, show_end_idx)
 
 
                 # Perform PCA analysis
                 method = "IG" # using only this method
-                pca_analysis(method, outputs, column_2_idx, results, show_start_idx, show_end_idx)
+                pca = pca_analysis(method, outputs, column_2_idx, results, show_start_idx, show_end_idx)
 
 
                 # Perform PCA analysis
                 method = "Multi-Feature" # using only this method
-                pca_analysis(method, outputs, column_2_idx, results, show_start_idx, show_end_idx)
+                pca = pca_analysis(method, outputs, column_2_idx, results, show_start_idx, show_end_idx)
+
+
+                # heat map plot of loading
+                features = methods[:-1]
+                feature_2_idx = {k: column_2_idx[k.lower()] for k in features}
+                feature_idx_names = []
+                for k in methods[:-1]:
+                    feature_idx_names.extend([k + ' ' + str(len(feature_2_idx[k])-i) if len(feature_2_idx[k]) > 1 else k for i in range(len(feature_2_idx[k]))])
+
+                # Get the loadings (components)
+                loadings = pd.DataFrame(
+                    pca.components_.T,  # Transpose to match feature-column structure
+                    columns=[f'PC{i+1}' for i in range(pca.components_.shape[0])],  
+                    index=feature_idx_names
+                )
+                # Plot the loadings
+                plt.figure(figsize=(12, 3))
+                sns.heatmap(loadings.T, annot=False, cmap='coolwarm', center=0, fmt=".2f", cbar=True)
+                plt.xlabel('Hidden dimension', fontsize=14)
+                # rotate the y labels
+                plt.yticks(rotation=0)
+                plt.tight_layout()
+                plt.savefig(save_folder / f'pca_loadings_{method}.png')
+                plt.show()
+                plt.close()
+
+
+
 
 
             # handle any except, get the error for print
@@ -2069,6 +2496,38 @@ def parse_args():
     parser.add_argument('--data_types', nargs='+', default=['val'], help='Data type')    
  
     return parser.parse_args()
+
+
+
+
+# import mdates
+import matplotlib.dates as mdates
+
+def set_meaningful_xticks(ax, start, end):
+
+    # if the time span is less than a day (visualize on an hourly basis)
+    if (end - start).days < 1:
+        ax.xaxis.set_major_locator(mdates.DayLocator())  # Marks start and end with full date
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M\n%d-%m-%Y'))  # Format in Day-Month-Year Hour:Minute
+        ax.tick_params(axis='x', which='major', labelsize=10, rotation=0, pad=5.5)#, labelcolor='navy')
+
+        # Minor ticks: Hourly intervals
+        ax.xaxis.set_minor_locator(mdates.HourLocator(interval=1))  # Set hourly intervals
+        ax.xaxis.set_minor_formatter(mdates.DateFormatter('%H:%M'))  # Format in Hour:Minute
+        ax.tick_params(axis='x', which='minor', labelsize=10, rotation=0, pad=8)#, labelcolor='navy')
+
+    # else, just how the days
+    else:
+        ax.xaxis.set_major_locator(mdates.DayLocator())  # Marks start and end with full date
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M\n%d-%m-%Y'))  # Format in Day-Month-Year Hour:Minute
+        ax.tick_params(axis='x', which='major', labelsize=10, rotation=0, pad=5.5)#, labelcolor='navy')
+
+
+    return ax
+
+
+
+
 
 
 if __name__ == "__main__":

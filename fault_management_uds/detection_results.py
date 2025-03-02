@@ -1064,17 +1064,21 @@ def main(model_save_path, data_type):
         labels = np.nan_to_num(labels)
         
         # Format as percentage
-        labels = [f"{v:.1%}" if v > 0 else "" for v in labels]
+        #labels = [f"{v:.1%}" if v > 0 else "" for v in labels]
+        labels = [f"{int(v*100)}%" if v * 100 == int(v * 100) else f"{v:.1%}" if v > 0 else "" for v in labels]
+
         
         # Add bar labels only where values are non-zero
-        ax.bar_label(container, labels=labels, label_type="edge", fontsize=11, padding=3)
+        ax.bar_label(container, labels=labels, label_type="edge", fontsize=14, padding=3, color="black", weight="bold")
 
     # increase font size for x-axis
-    plt.xticks(fontsize=16)
+    plt.xticks(fontsize=18)
+    # increase y ticks
+    plt.yticks(fontsize=16)
 
 
     # Labels and title
-    plt.ylabel("Total Count", fontsize=16)
+    plt.ylabel("Total Count", fontsize=18)
     plt.xlabel(" ", fontsize=12)
 
     plt.legend(title=None, loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=14)
@@ -1088,7 +1092,7 @@ def main(model_save_path, data_type):
     plt.show()
     plt.close()
 
-
+    #raise ValueError("Stop here")
 
 
     fig, axes = plt.subplots(3, len(methods), figsize=(16, 5), sharex="col")

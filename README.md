@@ -1,19 +1,53 @@
-# Fault Management in Urban Drainage Systems
+# Multi-Feature Anomaly Detection in Urban Drainage Systems
 
-<a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
-    <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
-</a>
+#### *using Transformers, Isolation Forest & Targeted Iterative Refinement*
 
-A short description of the project.
+##
+## Introduction
+
+This repository contains the code my thesis on modelling and anomaly detection in urban drainage systems.
+
+In general, the project has contributed to:
+
+- Improved Data Processing of the Bellinge Dataset
+- Analysis of the Bellinge Dataset
+- Modelling of the Bellinge Dataset
+- Anomaly Detection using synthetic anomalies
 
 
-conda env export > environment.yml
-
-
-conda env create -f environment.yml
+### Using the Repository
 
 
 
+These are the main scripts in the project in a chronological order (see `submit_gpu.sh` for use-cases):
+
+*Data Processing*:
+
+- `notebooks/0_processing/1_processing_data.ipynb`
+- `notebooks/0_processing/2_handling_data.ipynb`
+
+*Modelling*:
+
+- `fault_management_uds/train.py`
+  - See the `experiments` folder for the different experiments
+  - See `notebooks/3_evaluation/` for further evaluation of the models
+
+*Anomaly Detection*:
+
+- `notebooks/1_synthetic/create_polluted_data.ipynb`
+- Then you can run these scripts in the `fault_management_uds/` folder:
+  1. `train.py` for training on the polluted data.
+  2. `features.py` for extracting features for anomaly detection.
+  3. `evaluate.py` for evaluating the anomaly detection.
+
+
+##
+**Due to time contraints**, the documentation could be improved. However, you are always welcome to contact me for further information or help.
+
+
+#
+#
+---
 
 ## Project Organization
 
